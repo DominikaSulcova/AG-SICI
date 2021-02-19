@@ -30,7 +30,7 @@ Experimental session
 EEG --> TEPs 
 ------------------------------------------------------------
 preprocessing:
-- AGSICI_preprocess.lwscript
+- AGSICI_ffilter.lwscript
 
 TEP analysis:
 
