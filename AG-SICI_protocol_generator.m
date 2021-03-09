@@ -11,7 +11,7 @@
 clear all, clc
 
 target_cortex = 'AG';  
-participant = {'01'};
+participant = {'03'};
 n_protocol = 8;
 amplitude = [100 120 140; 25 25 25];        % disponible output stim amplitudes 
                                             % --> r1: intensities (%rMT); r2: repetitions
@@ -20,8 +20,13 @@ ISI = [4000, 5000, 6000; 25, 25, 24];       % disponible ISI times
 max_rep = 3;                                % maximum repetition of both ISI and intensity
 
 %% write the file
+% cycle through participants
 repetitions = sum(amplitude(2,:));
 for p = 1:length(participant)
+    % outcome file
+    outcome = [];
+    
+    % cycle through blocks
     for n = 1:n_protocol
         waiting_time = randomize(ISI, max_rep);
         intensity = randomize(amplitude, max_rep);
@@ -34,7 +39,13 @@ for p = 1:length(participant)
                 MagPro_single_bi(filename, i, waiting_time(i - 1), intensity(i));
             end        
         end
+        % append to aoutcome
+        outcome = cat(2, outcome, intensity); 
     end
+    
+    % save stim order
+    filename_stim = ['stim_order_' participant{p}];
+    save([filename_stim '.mat'], 'outcome')
 end
 clear p n 
 
