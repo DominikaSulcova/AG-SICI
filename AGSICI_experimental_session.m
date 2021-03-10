@@ -59,10 +59,11 @@ function  filename = initialize_logfile(session_info)
 % get the date
 c = fix(clock);
 date = [num2str(c(3)) '/' num2str(c(2)) '/' num2str(c(1))];
+time = [num2str(c(4)) ':' num2str(c(5))];
 clear c
 
 % define the filename
-filename = [session_info{1} '_' session_info{2} '_S' session_info{3} '.txt'];
+filename = [session_info{1} '_' session_info{2}(end-1:end) '_S' session_info{3} '.txt'];
 
 % count eletrodes
 for e = 1:numel(session_info) - 6
@@ -94,11 +95,13 @@ fprintf(fileID, '- every block consists of 25 stimuli of each tested intensity\r
 fprintf(fileID, '- current direction in the coil changes every other block\r\n');
 fprintf(fileID, '------------------------------------------------------------------------------------------------------\r\n');
 fprintf(fileID, '\r\n');
-fprintf(fileID, '\r\n');
 fprintf(fileID, ['rMT : ' num2str(session_info{5}) ' %%MSO\r\n']);
+fprintf(fileID, '\r\n');
 fprintf(fileID, ['stimulation intensities: ' num2str(session_info{6}(1)) ' - ' num2str(session_info{6}(2)) ' - ' num2str(session_info{6}(3)) ' %%MSO\r\n']);
 fprintf(fileID, '\r\n');
 fprintf(fileID, ['AG closest electrodes: ' electrodes{:} '\r\n']);
+fprintf(fileID, '\r\n');
+fprintf(fileID, ['session start: ' time '\r\n']);
 fprintf(fileID, '\r\n');
 fprintf(fileID, 'notes:\r\n');
 fprintf(fileID, '\r\n');
