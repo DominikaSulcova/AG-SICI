@@ -11,8 +11,9 @@
 clear all, clc
 
 target_cortex = 'AG';  
-participant = {'03'};
+participant = {'02'};
 n_protocol = 8;
+condition = {'N' 'R'};
 amplitude = [100 120 140; 25 25 25];        % disponible output stim amplitudes 
                                             % --> r1: intensities (%rMT); r2: repetitions
 ISI = [4000, 5000, 6000; 25, 25, 24];       % disponible ISI times
@@ -23,31 +24,43 @@ max_rep = 3;                                % maximum repetition of both ISI and
 % cycle through participants
 repetitions = sum(amplitude(2,:));
 for p = 1:length(participant)
-    % outcome file
-    outcome = [];
-    
-    % cycle through blocks
-    for n = 1:n_protocol
-        waiting_time = randomize(ISI, max_rep);
-        intensity = randomize(amplitude, max_rep);
-        filename = [target_cortex '_' participant{p} '_' num2str(n) '.CG3'];
-        MagPro_initialize_bi(filename,repetitions);
-        for i= 1:repetitions
-            if i==1
-                MagPro_single_bi(filename, i, 10000, intensity(i));
-            else
-                MagPro_single_bi(filename, i, waiting_time(i - 1), intensity(i));
-            end        
+    for c = 1:length(condition)
+        % outcome file
+        outcome = [];
+
+        % cycle through blocks
+        for n = 1:n_protocol
+            waiting_time = randomize(ISI, max_rep);
+            intensity = randomize(amplitude, max_rep);
+            filename = [target_cortex '_' participant{p} '_' condition{c} '_' num2str(n) '.CG3'];
+            MagPro_initialize_bi(filename,repetitions);
+            if c == 1
+                for i= 1:repetitions
+                    if i==1
+                        MagPro_single_bi_N(filename, i, 10000, intensity(i));
+                    else
+                        MagPro_single_bi_N(filename, i, waiting_time(i - 1), intensity(i));
+                    end        
+                end
+            elseif c == 2
+                for i= 1:repetitions
+                    if i==1
+                        MagPro_single_bi_R(filename, i, 10000, intensity(i));
+                    else
+                        MagPro_single_bi_R(filename, i, waiting_time(i - 1), intensity(i));
+                    end        
+                end
+            end
+            % append to aoutcome
+            outcome = cat(2, outcome, intensity); 
         end
-        % append to aoutcome
-        outcome = cat(2, outcome, intensity); 
+
+        % save stim order
+        filename_stim = ['stim_order_' participant{p} '_' condition{c}];
+        save([filename_stim '.mat'], 'outcome')
     end
-    
-    % save stim order
-    filename_stim = ['stim_order_' participant{p}];
-    save([filename_stim '.mat'], 'outcome')
 end
-clear p n 
+clear p c n 
 
 %% functions
 function seq = randomize(matrix, max_rep)
@@ -135,7 +148,7 @@ fprintf(fileID,'Number of Lines=%d\r\n',n_trials);
 fclose(fileID);
 end
 
-function [fileID]=MagPro_single_bi(filename, trial_number, isi, amplitude)
+function [fileID] = MagPro_single_bi_N(filename, trial_number, isi, amplitude)
 fileID = fopen(filename,'a');
 fprintf(fileID, '[protocol Line %d]\r\n',trial_number);
 fprintf(fileID, 'Delay=%d\r\n',isi);
@@ -150,4 +163,22 @@ fprintf(fileID, 'Repetition Rate=10\r\n');
 fprintf(fileID, 'Train Pulses=1\r\n');
 fclose(fileID);
 end
+
+
+function [fileID] = MagPro_single_bi_R(filename, trial_number, isi, amplitude)
+fileID = fopen(filename,'a');
+fprintf(fileID, '[protocol Line %d]\r\n',trial_number);
+fprintf(fileID, 'Delay=%d\r\n',isi);
+fprintf(fileID, 'Amplitude A Gain=%d\r\n',amplitude/10);
+fprintf(fileID, 'Mode=0\r\n');
+fprintf(fileID, 'Current Direction=2\r\n');
+fprintf(fileID, 'Wave Form=1\r\n');
+fprintf(fileID, 'Burst Pulses=2\r\n');
+fprintf(fileID, 'Inter Pulse Interval=10000\r\n');
+fprintf(fileID, 'BA Ratio=100\r\n');
+fprintf(fileID, 'Repetition Rate=10\r\n');
+fprintf(fileID, 'Train Pulses=1\r\n');
+fclose(fileID);
+end
+
 
