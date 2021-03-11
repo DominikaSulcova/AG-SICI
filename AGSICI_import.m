@@ -2,8 +2,8 @@
 % Written by Dominika for AG-SICI project (2021)
 % 
 % 1) loads raw EEG datasets recorded by the MEGA system
-%    and saves them in the current directory 
-% 2)
+%    and saves them in the current directory as .mat data + .lw6 header
+% 2) discards 'Out' events, keeps 'Stimulation' and counts them
 % 
 %% session info
 clear all; clc;
@@ -38,10 +38,10 @@ eval(['folder = ' answer ';']);
 clear answer prompt dlgtitle dims definput             
 
 
-%% 1) import MEGA datasets
+%% import MEGA datasets
 % import the datasets - blocks indicated by folders vector
 for b = 1:length(block)
-    % import the appropriate dataset
+    % 1) import the appropriate dataset
     [header, data] = EEG_import_MEGA(input_folder, folder(b));
                 
     % create the name for the dataset
@@ -53,7 +53,7 @@ for b = 1:length(block)
     EEG_history_import.configuration.parameters.session_number = folder(b);   
     header.history(1) =  EEG_history_import;
     
-    % ditch extra 'out' category
+    % 2) ditch extra 'out' category
     T = struct2table(header.events);                        % creates a table of the structure 'events'
     T.code = categorical(T.code);                           % in order to work with strings --> convert to categorical
     sortedT = T(T.code == 'Stimulation', :); 
