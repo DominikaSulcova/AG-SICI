@@ -41,7 +41,7 @@ name = [prefix ' ' session_info{1} ' ' session_info{2} ' ' session_info{4}];
 session_info{5} = questdlg('Real current direction?', 'Experimental condition',...
     '1 - normal  2 - reversed', '1 - reversed  2 - normal', '1 - normal  2 - reversed');
 
-% choose real current direction
+% choose current direction in the coil
 index = questdlg('TMS protocol sequence?', 'Parsing sequence',...
     '1 - normal  2 - reversed', '1 - reversed  2 - normal', '1 - normal  2 - reversed');
 
@@ -81,9 +81,50 @@ clear b e header
 
 %% 3) merge epochs according to conditions
 for i = 1:length(intensity)
-    for b = 1:length(block)
+    % split blocks according to current direction
+    switch session_info{5}
+        case '1 - normal  2 - reversed'
+            blocks2merge = [1:2:block(end); 2:2:block(end)];
+        case '1 - reversed  2 - normal'
+            blocks2merge = [2:2:block(end); 1:2:block(end)];
     end
+    
+    % ----- normal current direction -----
+    % merge data
+    merge_idx = 1:size(blocks2merge, 2);
+    datasets = struct;
+    for b = 1:size(blocks2merge, 2)
+        load([intensity{i} ' ' session_info{1} ' ' session_info{2} ' ' session_info{4} ' b' num2str(blocks2merge(1, b)) '.lw6'], '-mat');
+        datasets(b).header = header;
+        load([intensity{i} ' ' session_info{1} ' ' session_info{2} ' ' session_info{4} ' b' num2str(blocks2merge(1, b)) '.mat']);
+        datasets(b).data = data;
+    end
+    [header,data,message_string] = RLW_merge_epochs(datasets,merge_idx); 
+    
+    % save datasets
+    name_new = [session_info{1} ' ' session_info{2} ' ' session_info{4} ' normal ' intensity{i}];
+    save([name_new '.mat'], 'data')
+    header.name = name_new;
+    save([name_new '.lw6'], 'header')   
+    
+    % ----- reversed current direction -----
+    % merge data
+    merge_idx = 1:size(blocks2merge, 2);
+    datasets = struct;
+    for b = 1:size(blocks2merge, 2)
+        load([intensity{i} ' ' session_info{1} ' ' session_info{2} ' ' session_info{4} ' b' num2str(blocks2merge(2, b)) '.lw6'], '-mat');
+        datasets(b).header = header;
+        load([intensity{i} ' ' session_info{1} ' ' session_info{2} ' ' session_info{4} ' b' num2str(blocks2merge(2, b)) '.mat']);
+        datasets(b).data = data;
+    end
+    [header,data,message_string] = RLW_merge_epochs(datasets,merge_idx); 
+    
+    % save datasets
+    name_new = [session_info{1} ' ' session_info{2} ' ' session_info{4} ' reversed ' intensity{i}];
+    save([name_new '.mat'], 'data')
+    header.name = name_new;
+    save([name_new '.lw6'], 'header')
 end
-
+clear i b merge_idx data header message_string name_new
 
 
