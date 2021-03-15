@@ -21,16 +21,24 @@ clear prompt dlgtitle dims definput
 session_info{4} = questdlg('Coil placement?', 'Experimental condition',...
     'along axis', 'across axis', 'along axis');
 
+% choose real current direction
+session_info{5} = questdlg('Real current direction?', 'Experimental condition',...
+    '1 - normal  2 - reversed', '1 - reversed  2 - normal', '1 - normal  2 - reversed');
+
+% choose real current direction
+session_info{6} = questdlg('TMS protocol sequence?', 'Parsing sequence',...
+    '1 - normal  2 - reversed', '1 - reversed  2 - normal', '1 - normal  2 - reversed');
+
 % stimulation
 intensity = [100 120 140];
 
 %% stimulation intensity
 % M1 - rMT
-session_info{5} = cell2num(inputdlg('rMT at the beginning of the sesion:', 'rMT'));
+session_info{7} = cell2num(inputdlg('rMT at the beginning of the sesion:', 'rMT'));
 
 % calculate intensities
 intensity = round(intensity/100 * session_info{5});
-session_info{6} = intensity;
+session_info{8} = intensity;
 disp('Stimulation intensities:')
 disp(['100 %rMT --> ' num2str(intensity(1)) ' %MSO'])
 disp(['120 %rMT --> ' num2str(intensity(2)) ' %MSO'])
@@ -40,7 +48,7 @@ disp(['140 %rMT --> ' num2str(intensity(3)) ' %MSO'])
 prompt = {'Closest electrodes:'};
 dlgtitle = 'AG target';
 dims = [1 50];
-definput = {'27, 7, 15'};
+definput = {'7, 27, 29'};
 answer = cell2num(inputdlg(prompt,dlgtitle,dims,definput));
 clear prompt dlgtitle dims definput
 
@@ -66,8 +74,8 @@ clear c
 filename = [session_info{1} '_' session_info{2}(end-1:end) '_S' session_info{3} '.txt'];
 
 % count eletrodes
-for e = 1:numel(session_info) - 6
-    electrodes{e} = session_info{6 + e};
+for e = 1:numel(session_info) - 8
+    electrodes{e} = session_info{8 + e};
 end
 
 % write the file 
@@ -95,9 +103,13 @@ fprintf(fileID, '- every block consists of 25 stimuli of each tested intensity\r
 fprintf(fileID, '- current direction in the coil changes every other block\r\n');
 fprintf(fileID, '------------------------------------------------------------------------------------------------------\r\n');
 fprintf(fileID, '\r\n');
-fprintf(fileID, ['rMT : ' num2str(session_info{5}) ' %%MSO\r\n']);
+fprintf(fileID, ['Real current direction: ' session_info{5} '\r\n']);
 fprintf(fileID, '\r\n');
-fprintf(fileID, ['stimulation intensities: ' num2str(session_info{6}(1)) ' - ' num2str(session_info{6}(2)) ' - ' num2str(session_info{6}(3)) ' %%MSO\r\n']);
+fprintf(fileID, ['TMS protocol sequence: ' session_info{6} '\r\n']);
+fprintf(fileID, '\r\n');
+fprintf(fileID, ['rMT : ' num2str(session_info{7}) ' %%MSO\r\n']);
+fprintf(fileID, '\r\n');
+fprintf(fileID, ['stimulation intensities: ' num2str(session_info{8}(1)) ' - ' num2str(session_info{8}(2)) ' - ' num2str(session_info{8}(3)) ' %%MSO\r\n']);
 fprintf(fileID, '\r\n');
 fprintf(fileID, ['AG closest electrodes: ' electrodes{:} '\r\n']);
 fprintf(fileID, '\r\n');
