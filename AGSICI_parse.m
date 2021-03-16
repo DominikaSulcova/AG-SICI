@@ -94,11 +94,12 @@ for b = 1:length(block)
         continue
     end
     
-    % control for missing events
-    length(header.events)
+    % replace event codes
     for e = 1:length(header.events)
         header.events(e).code = num2str(stim_order(e, b));
     end
+    
+    % save dataset with the original name
     save([name ' b' num2str(block(b)) '.lw6'],'header');
 end
 clear b e header
