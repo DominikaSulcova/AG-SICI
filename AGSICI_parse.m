@@ -72,6 +72,30 @@ clear statement stim_order_N stim_order_R index s
 % loop through datasets
 for b = 1:length(block)
     load([name ' b' num2str(block(b)) '.lw6'],'-mat'); 
+    
+    % control for wrong number of events
+    if length(header.events) < 75
+        % ask for the right sequence
+        disp([session_info{1} ' ' session_info{2} ' ' session_info{4} ' block ' num2str(b)])
+        disp(['Found fewer than the expected number of events: ' num2str(length(header.events))])
+        prompt = {'Use following TMS stimuli:'};
+        dlgtitle = [session_info{1} ' ' session_info{2} ' ' session_info{4} ' block ' num2str(b)];
+        dims = [1 50];
+        definput = {'[1:75]'};
+        stims2keep = str2num(cell2mat(inputdlg(prompt,dlgtitle,dims,definput)));
+        clear prompt dlgtitle dims definput  
+        
+        % replace the stimuli in the stim_order
+        stim_order(1:length(stims2keep), b) = stim_order(stims2keep(1):stims2keep(end), b);
+        
+    elseif length(header.events) > 75
+        disp([session_info{1} ' ' session_info{2} ' ' session_info{4} ' block ' num2str(b)])
+        disp(['Found more than the expected number of events: ' num2str(length(header.events))])
+        continue
+    end
+    
+    % control for missing events
+    length(header.events)
     for e = 1:length(header.events)
         header.events(e).code = num2str(stim_order(e, b));
     end
