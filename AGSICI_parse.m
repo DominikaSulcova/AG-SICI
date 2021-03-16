@@ -94,9 +94,9 @@ for i = 1:length(intensity)
     merge_idx = 1:size(blocks2merge, 2);
     datasets = struct;
     for b = 1:size(blocks2merge, 2)
-        load([intensity{i} ' ' session_info{1} ' ' session_info{2} ' ' session_info{4} ' b' num2str(blocks2merge(1, b)) '.lw6'], '-mat');
+        load([intensity{i} ' ' intensity{i}(end-2:end) ' ' name ' b' num2str(blocks2merge(1, b)) '.lw6'], '-mat');
         datasets(b).header = header;
-        load([intensity{i} ' ' session_info{1} ' ' session_info{2} ' ' session_info{4} ' b' num2str(blocks2merge(1, b)) '.mat']);
+        load([intensity{i} ' ' intensity{i}(end-2:end) ' ' name ' b' num2str(blocks2merge(1, b)) '.mat']);
         datasets(b).data = data;
     end
     [header,data,message_string] = RLW_merge_epochs(datasets,merge_idx); 
@@ -112,9 +112,9 @@ for i = 1:length(intensity)
     merge_idx = 1:size(blocks2merge, 2);
     datasets = struct;
     for b = 1:size(blocks2merge, 2)
-        load([intensity{i} ' ' session_info{1} ' ' session_info{2} ' ' session_info{4} ' b' num2str(blocks2merge(2, b)) '.lw6'], '-mat');
+        load([intensity{i} ' ' intensity{i}(end-2:end) ' ' name ' b' num2str(blocks2merge(2, b)) '.lw6'], '-mat');
         datasets(b).header = header;
-        load([intensity{i} ' ' session_info{1} ' ' session_info{2} ' ' session_info{4} ' b' num2str(blocks2merge(2, b)) '.mat']);
+        load([intensity{i} ' ' intensity{i}(end-2:end) ' ' name ' b' num2str(blocks2merge(2, b)) '.mat']);
         datasets(b).data = data;
     end
     [header,data,message_string] = RLW_merge_epochs(datasets,merge_idx); 
