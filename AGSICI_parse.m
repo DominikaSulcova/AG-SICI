@@ -19,6 +19,7 @@ clc
 
 % dataset
 block = 1:8;
+block_all = 8;
 intensity = {'stim_100' 'stim_120' 'stim_140'};
 prefix = 'dc ds art-sup ep dc reref';
 
@@ -49,9 +50,9 @@ index = questdlg('TMS protocol sequence?', 'Parsing sequence',...
 % identify sequence of TMS protocols
 switch index
     case '1 - normal  2 - reversed'
-        index = repmat(['NR'], 1, numel(block)/2);
+        index = repmat(['NR'], 1, block_all/2);
     case '1 - reversed  2 - normal'
-        index = repmat(['RN'], 1, numel(block)/2);
+        index = repmat(['RN'], 1, block_all/2);
 end
 
 % load stim order matrices
@@ -62,7 +63,7 @@ stim_order_R = outcome;
 clear outcome
 
 % create final stim sequence
-for s = 1:length(block)
+for s = 1:block_all
     statement = ['stim_order(:, s) = stim_order_' index(s) '(:, s);'];
     eval(statement)
 end
@@ -76,27 +77,27 @@ for b = 1:length(block)
     % control for wrong number of events
     if length(header.events) < 75
         % ask for the right sequence
-        disp([session_info{1} ' ' session_info{2} ' ' session_info{4} ' block ' num2str(b)])
+        disp([session_info{1} ' ' session_info{2} ' ' session_info{4} ' block ' num2str(block(b))])
         disp(['Found fewer than the expected number of events: ' num2str(length(header.events))])
         prompt = {'Use following TMS stimuli:'};
-        dlgtitle = [session_info{1} ' ' session_info{2} ' ' session_info{4} ' block ' num2str(b)];
+        dlgtitle = [session_info{1} ' ' session_info{2} ' ' session_info{4} ' block ' num2str(block(b))];
         dims = [1 50];
         definput = {'[1:75]'};
         stims2keep = str2num(cell2mat(inputdlg(prompt,dlgtitle,dims,definput)));
         clear prompt dlgtitle dims definput  
         
         % replace the stimuli in the stim_order
-        stim_order(1:length(stims2keep), b) = stim_order(stims2keep(1):stims2keep(end), b);
+        stim_order(1:length(stims2keep), block(b)) = stim_order(stims2keep(1):stims2keep(end), block(b));
         
     elseif length(header.events) > 75
-        disp([session_info{1} ' ' session_info{2} ' ' session_info{4} ' block ' num2str(b)])
+        disp([session_info{1} ' ' session_info{2} ' ' session_info{4} ' block ' num2str(block(b))])
         disp(['Found more than the expected number of events: ' num2str(length(header.events))])
         continue
     end
     
     % replace event codes
     for e = 1:length(header.events)
-        header.events(e).code = num2str(stim_order(e, b));
+        header.events(e).code = num2str(stim_order(e, block(b)));
     end
     
     % save dataset with the original name
