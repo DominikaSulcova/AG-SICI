@@ -32,7 +32,7 @@ clear all; clc
 
 % ----- adjustable parameters -----
 % dataset
-subject = [1:8, 10:12];
+subject = [1, 3:8, 10, 12];
 position = {'along' 'across'}; 
 current = {'normal' 'reversed'};
 intensity = {'stim_100' 'stim_120' 'stim_140'};
@@ -75,6 +75,8 @@ x = [time_window(1):xstep:time_window(2)];
 x_start = (time_window(1) - header.xstart)/xstep;
 x_end = (time_window(2) - header.xstart)/xstep;
 
+clear c p 
+
 %% 1) load the data
 % load data based on the prefix + conditions
 for p = 1:length(position)
@@ -94,6 +96,7 @@ for p = 1:length(position)
         end
     end 
 end
+disp(['Datasize: ' num2str(size(AGSICI_data))])
 clear p c i s data 
 
 % save dataset to the global MATLAB file
@@ -106,9 +109,9 @@ end
 
 %% 2) preliminary TEP visualization 
 % ----- decide output parameters -----
-electrode = {'target'};
-y_limits = [-4, 4];
-line_type = {':' '--' '-'};
+electrode = {'Cz'};
+y_limits = [-4, 5.5];
+line_type = {':' '-.' '-'};
 % ------------------------------------
 
 % average data, calculate CI
@@ -119,7 +122,7 @@ for p = 1:length(position)
             for e = 1:size(AGSICI_data, 5)
                 for t = 1:size(AGSICI_data, 6)
                     AGSICI_data_mean(p, c, i, e, t) = mean(squeeze(AGSICI_data(p, c, i, :, e, t)));
-                    AGSICI_data_CI(p, c, i, e, t) = (std(squeeze(AGSICI_data(p, c, i, :, e, t)))/sqrt(length(participant))) * z;
+                    AGSICI_data_CI(p, c, i, e, t) = (std(squeeze(AGSICI_data(p, c, i, :, e, t)))/sqrt(length(subject))) * z;
                 end
             end 
         end        
@@ -145,28 +148,33 @@ for e = 1:length(electrode)
         for c = 1:length(current)
             % plot each tested position in a separate subplot
             subplot(2, 2, (p - 1)*2 + c)
+            
             for i = 1:length(intensity)  
                 % prepare data
-                data_visual = squeeze(AGSICI_data_mean(p, c, i, find(contains(labels, electrode{e})), :));                
+                data_visual = squeeze(AGSICI_data_mean(p, c, i, find(contains(labels, electrode{e})), :));  
                 
-                % shade interpolated interval 
-                plot(x, data_visual, 'b:', 'LineWidth', 0.5);
-                rectangle('Position', [0, y_limits(1), 0.01, y_limits(2) - y_limits(1)], 'FaceColor', [0.75 0.75 0.75], 'EdgeColor', 'none')
+                if i == 1
+                    % shade interpolated interval 
+                    plot(x, data_visual, 'b:', 'LineWidth', 0.5);
+                    hold on
+                    rectangle('Position', [0, y_limits(1), 0.01, y_limits(2) - y_limits(1)], 'FaceColor', [0.75 0.75 0.75], 'EdgeColor', 'none')
+                end
 
                 % plot data     
-                P(i) = plot(x, data_visual, 'Color', colours((p - 1)*2 + c, :), 'LineWidth', 2.5, 'LineStyle', line_type{i});
+                P(i) = plot(x, data_visual, 'Color', colours((p - 1)*2 + c, :), 'LineWidth', 2, 'LineStyle', line_type{i});
+                hold on
             end 
             
             % add other parameters
-            title(['Coil placed ' position{p} ' STS, ' current{c} ' current direction'])
+            title([position{p} ' STS, ' current{c} ' current'])
             xlabel('time (s)')
             ylabel('amplitude (\muV)')
             set(gca, 'FontSize', 14)
             xlim(time_window)
             ylim(y_limits)
             line([0, 0], y_limits, 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5)
-            lgd = legend(P, {'100 %rMT' '120 %rMT' '140 %rMT'}, 'Location', 'southwest');
-            lgd.FontSize = 14; title(lgd, 'Stimulation intensity')
+%             lgd = legend(P, {'100 %rMT' '120 %rMT' '140 %rMT'}, 'Location', 'southwest');
+%             lgd.FontSize = 14; title(lgd, 'Stimulation intensity')
         end
     end    
     hold off
@@ -195,13 +203,13 @@ for e = 1:length(electrode)
     for p = 1:length(position)
         for c = 1:length(current) 
             % prepare data
-            data_visual = squeeze(gmfp_data(p, c, find(contains(labels, electrode{e})), :)); 
-            CI_visual = squeeze(gmfp_CI(p, c, find(contains(labels, electrode{e})), :)); 
+            data_visual = squeeze(gmfp_data(p, c, find(contains(labels, electrode{e})), :))'; 
+            CI_visual = squeeze(gmfp_CI(p, c, find(contains(labels, electrode{e})), :))'; 
 
             % plot data     
             P((p - 1)*2 + c) = plot(x, data_visual, 'Color', colours((p - 1)*2 + c, :), 'LineWidth', 2.5);
-            F((p - 1)*2 + c) = fill([x fliplr(x)],[data_visual + CI_visual fliplr(data_visual - CI_visual)], ...
-                colours((p - 1)*2 + c, :), 'FaceAlpha', alpha, 'linestyle', 'none');
+%             F((p - 1)*2 + c) = fill([x fliplr(x)],[data_visual + CI_visual fliplr(data_visual - CI_visual)], ...
+%                 colours((p - 1)*2 + c, :), 'FaceAlpha', alpha, 'linestyle', 'none');
         end
     end
     
@@ -212,8 +220,8 @@ for e = 1:length(electrode)
     xlim(time_window)
     ylim(y_limits)
     line([0, 0], y_limits, 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5)
-    lgd = legend(P, {'along - normal' 'along - reversed' 'across - normal' 'across - reversed'}, 'Location', 'southwest');
-    lgd.FontSize = 14; title(lgd, 'Tested conditions')
+%     lgd = legend(P, {'along - normal' 'along - reversed' 'across - normal' 'across - reversed'}, 'Location', 'southwest');
+%     lgd.FontSize = 14; title(lgd, 'Tested conditions')
     
     % name and save figure
     figure_name = ['AGSICI_TEP_all_' electrode{e}];
@@ -223,7 +231,7 @@ for e = 1:length(electrode)
     % update figure counter
     figure_counter = figure_counter + 1 ;
 end
-clear e p c fig data_visual P F lgd figure_name
+clear e p c fig data_visual P F lgd figure_name CI_visual
 
 % save dataset to the global MATLAB file
 save(filename, 'AGSICI_data_mean', 'AGSICI_data_CI', '-append');
@@ -232,8 +240,7 @@ clear electrode AGSICI_data_CI
 %% 3) GMFP
 % ----- decide output parameters -----
 labeled = 'off';
-max_peaks = 5;
-peak_names = {'P20' 'N35' 'P50' 'N100' 'P180'};     % choose names of peaks based on the visual inspection of average signal
+max_peaks = 6;
 % ------------------------------------
 
 % loop through conditions, compute GMFP, plot
@@ -245,7 +252,7 @@ for p = 1:length(position)
 
         % set dataset name + figure title
         fig_name = ['AG-SICI_GMFP_' position{p} '_' current{c}];
-        fig_title = ['GMFP: position ' position{p} ' STS, ' current{c} ' current direction'];
+        fig_title = ['GMFP: ' position{p} ' STS, ' current{c} ' current'];
 
         % plot GMFP and extract peak latencies
         fig = figure(figure_counter);
@@ -254,15 +261,14 @@ for p = 1:length(position)
         if ~isempty(max_peaks)
         % plot GMFP
         h_axis(1) = subplot(3, max_peaks, [1 : 2*max_peaks]);
-        AGSICI_TEP(row_count).peaks = peak_names;
-        AGSICI_TEP(row_count).latencies(:) = gmfp_plot(x, squeeze(AGSICI_GMFP(p, c, :)), time_window, xstep, labeled, 'max_peaks', max_peaks);
+        AGSICI_TEP(row_count).latencies = gmfp_plot(x, squeeze(AGSICI_GMFP(p, c, :)), time_window, xstep, labeled, 'max_peaks', max_peaks);
         title(fig_title, 'fontsize', 16, 'fontweight', 'bold')
 
         % add topoplots
-        for t = 1:length(AGSICI_TEP(row_count).peaks)
+        for t = 1:length(AGSICI_TEP(row_count).latencies)
             % plot the topoplot
             h_axis(1 + t) = subplot(3, max_peaks, 2*max_peaks + t);
-            gmfp_topoplot(header, gmfp, AGSICI_TEP(row_count).peaks(t), time_window(1), [-2, 2])
+            gmfp_topoplot(header, squeeze(gmfp_data(p, c, :, :)), AGSICI_TEP(row_count).latencies(t), time_window(1), [-2, 2])
 
             % shift down
             pos = get(h_axis(1 + t), 'Position');
@@ -270,11 +276,11 @@ for p = 1:length(position)
             set(h_axis(1 + t), 'Position', pos);
 
             % add timing
-            text(-0.3, -0.8, sprintf('%1.0fms', AGSICI_TEP(row_count).peaks(t)*1000), 'Color', [1 0 0], 'FontSize', 14)
+            text(-0.3, -0.8, sprintf('%1.0f ms', AGSICI_TEP(row_count).latencies(t)*1000), 'Color', [1 0 0], 'FontSize', 14)
         end
 
         else
-            AGSICI_TEP(row_count).latencies(:) = gmfp_plot(x, squeeze(AGSICI_GMFP(p, c, :)), time_window, xstep, labeled,);
+            AGSICI_TEP(row_count).latencies(:) = gmfp_plot(x, squeeze(AGSICI_GMFP(p, c, :)), time_window, xstep, labeled);
         end  
         hold off
 
@@ -287,14 +293,15 @@ for p = 1:length(position)
         row_count = row_count + 1;
     end
 end
-clear p c t h_axis pos fig_name fig_title row_count
+clear p c t h_axis pos fig_name fig_title row_count fig
 
 % append new variables to the general MATLAB file
 save(filename, 'AGSICI_GMFP', 'AGSICI_TEP', '-append')
+clear labeled max_peaks
 
 %% 4) peak widths
 % calculate narrow window parameters
-x_start_narrow = (0.01 - time_window(1))/xstep;
+x_start_narrow = (0.015 - time_window(1))/xstep;
 x_end_narrow = (0.25 - time_window(1))/xstep;
 x_narrow = [0.01:xstep:0.25];
 
@@ -306,34 +313,41 @@ for p = 1:length(position)
         data = squeeze(AGSICI_GMFP(p, c, x_start_narrow:x_end_narrow));
 
         % identify peak widths
-        [P, L, AGSICI_TEP(row_count).widths, R] = findpeaks(data, 'Annotate','extents', 'WidthReference', 'halfheight');
+        [P, L, AGSICI_TEP(row_count).widths, R] = findpeaks(data, 'Annotate','extents', ...
+            'WidthReference', 'halfheight','MinPeakDistance', 10, 'MinPeakProminence', 0.01);
         AGSICI_TEP(row_count).widths = ceil(AGSICI_TEP(row_count).widths) * header.xstep;
-        if length(AGSICI_TEP(row_count).widths) ~= length(AGSICI_TEP(row_count).peaks)
+        if length(AGSICI_TEP(row_count).widths) ~= length(AGSICI_TEP(row_count).latencies)
             disp('ATTENTION: number of identified peaks does not match with peaks extracted in the previous step!')
         end
 
         % plot figure
         fig = figure(figure_counter);
         hold on
-        findpeaks(data, x_narrow, 'Annotate', 'extents', 'WidthReference', 'halfheight');
+        findpeaks(data, 'Annotate', 'extents', 'WidthReference', 'halfheight', 'MinPeakDistance', 10, 'MinPeakProminence', 0.01);
+        hold on
         set(gca, 'fontsize', 14)
         xlabel('time(s)')
         ylabel('power (\muV^2)')
         grid off
+        legend off
 
         % add width denotation
-        for k = 1:length(AGSICI_TEP_widths)
-            if k == length(AGSICI_TEP_widths)
-                text(AGSICI_TEP(row_count).latencies(k) - 0.005, -0.25, sprintf('%1.0f ms', AAGSICI_TEP(row_count).widths(k)*1000), 'Color', [0.93 0.69 0.13], 'FontSize', 14)
+        hold on
+        for k = 1:length(AGSICI_TEP(row_count).latencies)
+            if k == length(AGSICI_TEP(row_count).latencies)
+                hold on
+                text(AGSICI_TEP(row_count).latencies(k) - 0.005, -0.25, sprintf('%1.0f ms', AGSICI_TEP(row_count).widths(k)*1000), 'Color', [0.93 0.69 0.13], 'FontSize', 14)
             else
+                hold on
                 text(AGSICI_TEP(row_count).latencies(k) - 0.005, -0.25, sprintf('%1.0f', AGSICI_TEP(row_count).widths(k)*1000), 'Color', [0.93 0.69 0.13], 'FontSize', 14)
             end
         end
         xlim([-0.005, 0.26])
-
+        hold off
+        
         % save figure, update
-        savefig(['AG-SICI_' target '_widths'])
-        saveas(fig, ['AG-SICI_' target '_widths.png'])
+        savefig('AG-SICI_widths')
+        saveas(fig, ['AG-SICI_widths.png'])
         figure_counter = figure_counter + 1;
         
         % update row counter
@@ -538,18 +552,21 @@ plot(x, y, 'Color', [0 0 0], 'LineWidth', 2.5)
 line([0, 0], yl, 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5)
 
 % find peaks 
-[pks, locs] = findpeaks(y);
+[pks, locs] = findpeaks(y, 'MinPeakDistance', 10, 'MinPeakProminence', 0.01);
 for a = 1:length(locs)
-    if time_window(1) + locs(a)*xstep <= 0.01
+    if time_window(1) + locs(a)*xstep <= 0.015
         idx(a) = false;
-    elseif time_window(1) + locs(a)*xstep > 0.25
+    elseif time_window(1) + locs(a)*xstep > 0.205
         idx(a) = false;        
     else
         idx(a) = true;
     end
 end
 pks = pks(idx); locs = locs(idx);
-pks = pks(1:max_peaks); locs = locs(1:max_peaks);
+if length(pks) > max_peaks
+    pks = pks(1:max_peaks); 
+    locs = locs(1:max_peaks);
+end
 
 % calculate peak coordinations
 for a = 1:length(locs)
