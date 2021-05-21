@@ -1,9 +1,10 @@
 %% EEG DATA IMPORT
 % Written by Dominika for AG-SICI project (2021)
 % 
-% 1) loads raw EEG datasets recorded by the MEGA system
+% 1) Loads raw EEG datasets recorded by the MEGA system
 %    and saves them in the current directory as .mat data + .lw6 header
-% 2) discards 'Out' events, keeps 'Stimulation' and counts them
+%    ATTENTION: requires a letswave history file EEG_history_import.mat 
+% 2) Discards 'Out' events, keeps 'Stimulation' and counts them
 % 
 %% session info
 clear all; clc;
