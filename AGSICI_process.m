@@ -22,7 +22,7 @@
 %       - automatically identifies local peaks within [0.01 0.25]s and
 %       saves peak latencies in the outcome structure
 % 
-% 4) define peak widths using grand average GMFP
+% 4) define peak widths using grand average GMFP - just informative 
 %       - for each condition separately, plots and saves the figure 
 %       - uses function findpeaks awith the 'halfheight' option
 %       - saves peak widths in the outcome structure
@@ -37,6 +37,7 @@ position = {'along' 'across'};
 current = {'normal' 'reversed'};
 intensity = {'stim_100' 'stim_120' 'stim_140'};
 prefix = 'avg avgchan bl icfilt ica visual crop but fft-notchfilt prefilt prea P1'; 
+filename = 'AG-SICI.mat';
 
 % visualization 
 time_window = [-0.05, 0.3];
@@ -100,7 +101,6 @@ disp(['Datasize: ' num2str(size(AGSICI_data))])
 clear p c i s data 
 
 % save dataset to the global MATLAB file
-filename = 'AG-SICI.mat';
 if exist(filename) == 0
     save(filename, 'AGSICI_data');
 else
@@ -234,8 +234,8 @@ end
 clear e p c fig data_visual P F lgd figure_name CI_visual
 
 % save dataset to the global MATLAB file
-save(filename, 'AGSICI_data_mean', 'AGSICI_data_CI', '-append');
-clear electrode AGSICI_data_CI
+save(filename, 'AGSICI_data_mean', 'AGSICI_data_CI', 'gmfp_data', 'gmfp_CI', '-append');
+clear electrode AGSICI_data_CI gmfp_data gmfp_CI
 
 %% 3) GMFP
 % ----- decide output parameters -----
@@ -300,10 +300,14 @@ save(filename, 'AGSICI_GMFP', 'AGSICI_TEP', '-append')
 clear labeled max_peaks
 
 %% 4) peak widths
+% ----- decide output parameters -----
+x_limit = [0.015, 0.220];
+% ------------------------------------
+
 % calculate narrow window parameters
-x_start_narrow = (0.015 - time_window(1))/xstep;
-x_end_narrow = (0.25 - time_window(1))/xstep;
-x_narrow = [0.01:xstep:0.25];
+x_start_narrow = (x_limit(1) - time_window(1))/xstep;
+x_end_narrow = (x_limit(2) - time_window(1))/xstep;
+x_narrow = [x_limit(1) : xstep: x_limit(2)];
 
 % loop through conditions
 row_count = 1;
@@ -314,7 +318,7 @@ for p = 1:length(position)
 
         % identify peak widths
         [P, L, AGSICI_TEP(row_count).widths, R] = findpeaks(data, 'Annotate','extents', ...
-            'WidthReference', 'halfheight','MinPeakDistance', 10, 'MinPeakProminence', 0.01);
+            'WidthReference', 'halfheight','MinPeakDistance', 10, 'MinPeakProminence', 0.015);
         AGSICI_TEP(row_count).widths = ceil(AGSICI_TEP(row_count).widths) * header.xstep;
         if length(AGSICI_TEP(row_count).widths) ~= length(AGSICI_TEP(row_count).latencies)
             disp('ATTENTION: number of identified peaks does not match with peaks extracted in the previous step!')
@@ -323,31 +327,30 @@ for p = 1:length(position)
         % plot figure
         fig = figure(figure_counter);
         hold on
-        findpeaks(data, 'Annotate', 'extents', 'WidthReference', 'halfheight', 'MinPeakDistance', 10, 'MinPeakProminence', 0.01);
-        hold on
+        findpeaks(data, x_narrow, 'Annotate', 'extents', 'WidthReference', 'halfheight', 'MinPeakProminence', 0.015);
         set(gca, 'fontsize', 14)
         xlabel('time(s)')
         ylabel('power (\muV^2)')
+        title([position{p} ' STS, ' current{c} ' current'])
         grid off
         legend off
 
         % add width denotation
-        hold on
-        for k = 1:length(AGSICI_TEP(row_count).latencies)
-            if k == length(AGSICI_TEP(row_count).latencies)
-                hold on
-                text(AGSICI_TEP(row_count).latencies(k) - 0.005, -0.25, sprintf('%1.0f ms', AGSICI_TEP(row_count).widths(k)*1000), 'Color', [0.93 0.69 0.13], 'FontSize', 14)
+        for k = 1:numel(AGSICI_TEP(row_count).latencies)
+            if k == numel(AGSICI_TEP(row_count).latencies)                
+                text(AGSICI_TEP(row_count).latencies(k) - 0.005, -0.25, ...
+                    sprintf('%1.0f ms', AGSICI_TEP(row_count).widths(k)*1000), 'Color', [0.93 0.69 0.13], 'FontSize', 14)
             else
-                hold on
-                text(AGSICI_TEP(row_count).latencies(k) - 0.005, -0.25, sprintf('%1.0f', AGSICI_TEP(row_count).widths(k)*1000), 'Color', [0.93 0.69 0.13], 'FontSize', 14)
+                text(AGSICI_TEP(row_count).latencies(k) - 0.005, -0.25, ...
+                    sprintf('%1.0f', AGSICI_TEP(row_count).widths(k)*1000), 'Color', [0.93 0.69 0.13], 'FontSize', 14)
             end
         end
-        xlim([-0.005, 0.26])
+        ylim([-0.5, 2])
         hold off
         
         % save figure, update
-        savefig('AG-SICI_widths')
-        saveas(fig, ['AG-SICI_widths.png'])
+        savefig(['AG-SICI_widths_' position{p} '_' current{c}])
+        saveas(fig, ['AG-SICI_widths' position{p} '_' current{c} '.png'])
         figure_counter = figure_counter + 1;
         
         % update row counter
@@ -357,175 +360,219 @@ end
 
 % append new variables to the general MATLAB file
 save(filename, 'AGSICI_TEP', '-append');
-clear x_start_narrow x_end_narrow x_narrow c p k data fig P L R row_count
+clear x_limit x_start_narrow x_end_narrow x_narrow c p k data fig P L R row_count
 
 %% 5) EOIs
 % ----- decide output parameters -----
-seed_electrode = {'target' 'Cz'};                           % electrode that will be used to set 0 timepoint
-seed_peaks = {1:4, 5:6};                                    % which peek s use which seed electrode
-buffer = 0.5;                                               % a margin of the window for peak visualisation 
-eoi_n = 3;                                                  % number of detected EOIs
+seed_electrode = {'target'};                                        % electrode that will be used to set 0 timepoint
+AGSICI_TEP_avg.peak = {'P25' 'N40' 'N50' 'P75' 'N100' 'P180'};      % choose peak names
+AGSICI_TEP_avg.center = [0.025, 0.04, 0.05, 0.075, 0.110, 0.200];   % choose default peak centers
+AGSICI_TEP_avg.width = [0.02, 0.02, 0.02, 0.04, 0.06, 0.08];        % choose default peak widths
+buffer = 0.5;                                                       % a margin of the window for peak visualisation 
+eoi_n = 3;                                                          % number of detected EOIs
 % ------------------------------------
 
-% identify individual peaks - baseline datasets
-% k = 1; p = 1; m = 1; s = 1; e = 1;
-for k = 1:length(AGSICI_TEP(1).peaks)
-    % select seed 
-    if numel(seed_electrode) ~= numel(seed_peaks)
-        disp('Number of seed electrodes does not correspond to the seed peak distribution!')
-    end
-    for a = 1:numel(seed_electrode)
-        if any(seed_peaks{a} == k)
-            seed = find(contains(labels, seed_electrode{a}));
-        end
-    end
-    
-    % loop through the datasets
-    counter = 1;
-    for p = 1:length(position)
-        for c = 1:length(current)
-            for s = 1:length(subject)
-                % choose data 
-                for e = 1:size(AGSICI_data, 5)
-                    data(1, e, 1, 1, 1, :) = squeeze(GABA_data(m, 1, s, p, e, :));
+% average data across intensities
+for p = 1:length(position)
+    for c = 1:length(current)
+        for s = 1:length(subject)
+            % average across intensities
+            for e = 1:size(AGSICI_data, 5)
+                for t = 1:size(AGSICI_data, 6)
+                    eoi_data(p, c, s, e, t) = mean(squeeze(AGSICI_data(p, c, :, s, e, t)));
                 end
+            end 
+        end        
+    end
+end
+clear p c s e t 
 
-                % identify peak latency for current dataset
-                [peak_center, data_c, data_c_sub] = track_peak(data, header, time_window, k, GABA_TEP(s), buffer, seed);
-                
-                % fill in outcome structure
-                GABA_TEP_subject(p).latency(m, k) = peak_center;
-                
-                % append centered data
-                statement = ['GABA_' GABA_TEP(s).peaks{k} '_centered(counter, :, :) = data_c;'];
-                eval(statement)
-                
-                % append centered subtracted data
-                statement = ['GABA_' GABA_TEP(s).peaks{k} '_subtracted(counter, :, :) = data_c_sub;'];
-                eval(statement)
-                
-                % update row counter
-                counter = counter + 1;
+% track selected peaks
+% a = 1; k = 1; p = 1; c = 1; 
+for a = 1:numel(seed_electrode)
+    % index seed electrode
+    seed = find(contains(labels, seed_electrode{a}));
+    
+    for k = 1:length(AGSICI_TEP_avg.peak)     
+        % check if this peek should be tracked
+        answer = questdlg(['Do you want to track ' AGSICI_TEP_avg.peak{k} ' ?'], ...
+            [seed_electrode{a} ' electrode , peak ' AGSICI_TEP_avg.peak{k}], 'YES', 'NO', 'NO'); 
+        switch answer
+            case 'YES'
+                processed_peaks(k) = true; 
+            case 'NO'
+                processed_peaks(k) = false; 
+                continue
+        end
+
+        % loop through the datasets
+        for p = 1:length(position)
+            for c = 1:length(current)
+                for s = 1:length(subject)
+                    row_counter = 1;
+                    
+                    % choose data 
+                    for e = 1:size(eoi_data, 4)
+                        data(1, e, 1, 1, 1, :) = squeeze(eoi_data(p, c, s, e, :));
+                    end
+
+                    % identify peak latency for current dataset
+                    [peak_center, data_c, data_c_sub] = track_peak(data, header, time_window, ...
+                        k, subject(s), AGSICI_TEP_avg, buffer, seed);
+
+                    % fill in outcome structure
+                    AGSICI_TEP_subject(s).latency(p, c, seed_peaks{a}(k)) = peak_center;
+
+                    % append centered data
+                    statement = ['AGSICI_' AGSICI_TEP_avg.peak{seed_peaks{a}(k)} '_' position{p} '_' current{c} ...
+                        '_centered(row_counter, :, :) = data_c;'];
+                    eval(statement)
+
+                    % append centered subtracted data
+                    statement = ['AGSICI_' AGSICI_TEP_avg.peak{seed_peaks{a}(k)} '_' position{p} '_' current{c} ...
+                        '_subtracted(row_counter, :, :) = data_c_sub;'];
+                    eval(statement)
+
+                    % update row counter
+                    row_counter = row_counter + 1;
+                end
             end
         end
     end
 end
-clear counter a k p m t s e data statement peak_center data_c data_c_sub seed
+clear row_counter seed answer a k p c e data statement peak_center data_c data_c_sub 
 
-% average across subjects and sessions, save for letswave
-for k = 1:length(GABA_TEP(1).peaks)
-    % choose centered data
-    statement = ['data_i =  GABA_' GABA_TEP(1).peaks{k} '_centered;'];
-    eval(statement)
+% average across subjects, save for letswave
+for k = 1:length(AGSICI_TEP_avg.peak)    
+    % fill in peak name 
+    AGSICI_eoi(k).peak = AGSICI_TEP_avg.peak{k};
     
-    % average across trials (subject x medication)
-    for e = 1:size(data_i, 2)
-        for i = 1:size(data_i, 3)
-            data(1, e, 1, 1, 1, i) =  mean(squeeze(data_i(:, e, i)));         
-            GABA_tracking(k).centered(e, i) = mean(squeeze(data_i(:, e, i)));        
-        end
+    % skip round if the dataset doesn't exists
+    if ~exist(['AGSICI_' AGSICI_TEP_avg.peak{k} '_centered'])
+        disp(['Peak ' AGSICI_TEP_avg.peak{k} ' : dataset not found.'])
+        continue
     end
     
-    % save for LW
-    filename = ['TEP tracked ' target ' '  GABA_TEP(1).peaks{k} ' centered'];
-    header.name = filename; 
-    header.datasize(6) = size(data, 6);
-    span = (1 + buffer) * GABA_TEP(1).widths(k);
-    header.xstart = - span/2;
-    save([filename '.mat'], 'data');
-    save([filename '.lw6'], 'header');    
-    clear data
+    % loop through datasets
+    for p = 1:length(position)
+        for c = 1:length(current)
+            % fill in mean latency
+            AGSICI_eoi(k).latency(p, c) = AGSICI_TEP_avg.peak{k};
     
-    % choose centered subtracted data
-    statement = ['data_i =  GABA_' GABA_TEP(1).peaks{k} '_subtracted;'];
-    eval(statement)
-    
-    % average across trials (subject x medication)
-    for e = 1:size(data_i, 2)
-        for i = 1:size(data_i, 3)
-            data(1, e, 1, 1, 1, i) =  mean(squeeze(data_i(:, e, i)));         
-            GABA_tracking(k).subtracted(e, i) = mean(squeeze(data_i(:, e, i)));        
+            % choose centered data
+            statement = ['data_i =  AGSICI_' AGSICI_TEP_avg.peak{k} '_' position{p} '_' current{c} '_centered;'];
+            eval(statement)
+
+            % average across trials (subject x medication)
+            for e = 1:size(data_i, 2)
+                for i = 1:size(data_i, 3)
+                    data(1, e, 1, 1, 1, i) =  mean(squeeze(data_i(:, e, i)));         
+                    AGSICI_eoi(k).data(e, i) = mean(squeeze(data_i(:, e, i)));        
+                end
+            end
+
+            % save for LW
+            filename = ['TEP tracked ' target ' '  GABA_TEP(1).peaks{k} ' centered'];
+            header.name = filename; 
+            header.datasize(6) = size(data, 6);
+            span = (1 + buffer) * GABA_TEP(1).widths(k);
+            header.xstart = - span/2;
+            save([filename '.mat'], 'data');
+            save([filename '.lw6'], 'header');    
+            clear data
+
+            % choose centered subtracted data
+            statement = ['data_i =  GABA_' GABA_TEP(1).peaks{k} '_subtracted;'];
+            eval(statement)
+
+            % average across trials (subject x medication)
+            for e = 1:size(data_i, 2)
+                for i = 1:size(data_i, 3)
+                    data(1, e, 1, 1, 1, i) =  mean(squeeze(data_i(:, e, i)));         
+                    GABA_tracking(k).subtracted(e, i) = mean(squeeze(data_i(:, e, i)));        
+                end
+            end
+
+            % save for LW
+            filename = ['TEP tracked ' target ' '  GABA_TEP(1).peaks{k} ' subtracted'];
+            header.name = filename; 
+            save([filename '.mat'], 'data');
+            save([filename '.lw6'], 'header');    
+            clear data  
         end
     end
-    
-    % save for LW
-    filename = ['TEP tracked ' target ' '  GABA_TEP(1).peaks{k} ' subtracted'];
-    header.name = filename; 
-    save([filename '.mat'], 'data');
-    save([filename '.lw6'], 'header');    
-    clear data    
 end
 clear k e i data_i statement filename span
 
-% choose EOIs based on centered datasets
-for k = 1:length(GABA_TEP(1).peaks)
-    % choose data, baseline correct
-    data =  GABA_tracking(k).centered;
-    
-    % choose peak polarity
-    if strcmp(GABA_TEP(1).peaks{k}(1), 'P')
-        operation = 'max';
-    elseif strcmp(GABA_TEP(1).peaks{k}(1), 'N')
-        operation = 'min';
-    end
-    
-    % loop through electrodes
-    for e = 1:size(data, 1)
-        % calculate maximal amplitude
-        statement = ['peak_value(e) = ' operation '(data(e, :));'];
-        eval(statement)
-    end
-    
-    % identify three electrodes with the biggest response
-    for e = 1:eoi_n
-        statement = ['eoi_value(e) = ' operation '(peak_value);'];
-        eval(statement)
-        GABA_tracking(k).eoi.number(e) = find(peak_value == eoi_value(e));
-        GABA_tracking(k).eoi.name{e} = labels(find(peak_value == eoi_value(e))); 
-        peak_value(find(peak_value == eoi_value(e))) = 0;
-    end
-    
-    % visualization parameters
-    x_lim = ((1 + buffer) * GABA_TEP(1).widths(k))/2;
-    x_eoi = -x_lim:xstep:x_lim;
-    col = [0.8, 0.11, 0.23; 0.9, 0.24, 0.24; 1, 0.45, 0.45];
-    
-    % plot 
-    fig = figure(figure_counter)
-    hold on
-    counter = 1;
-    for e = 1:size(data, 1)
-        if any(GABA_tracking(k).eoi.number == e)
-            P(counter) = plot(x_eoi, data(e, :), 'Color', col(counter, :), 'LineWidth', 2.5);
-            counter = counter + 1;
-        else
-            plot(x_eoi, data(e, :), 'Color', [0.65, 0.65, 0.65], 'LineWidth', 1.5)
-        end
-    end
-    
-    % add other parameters
-    title(GABA_TEP(1).peaks{k})
-    xlabel('time (s)')
-    ylabel('amplitude (\muV)')
-    set(gca, 'FontSize', 14)
-    lgd = legend(P, {cell2mat(GABA_tracking(k).eoi.name{1}) cell2mat(GABA_tracking(k).eoi.name{2}) cell2mat(GABA_tracking(k).eoi.name{3})}, ...
-        'Location', 'northeast');
-    lgd.FontSize = 14;
-    hold off
-    
-    % name and save figure
-    figure_name = ['TEP_' target '_eoi'];
-    savefig([figure_name])
-    saveas(fig, [figure_name '.png'])
-        
-    % update figure counter
-    figure_counter = figure_counter + 1 ;
-end
-clear k e operation statement fig x_lim x col figure_name lgd P 
+% % choose EOIs based on centered datasets
+% for k = 1:length(GABA_TEP(1).peaks)
+%     % choose data, baseline correct
+%     data =  GABA_tracking(k).centered;
+%     
+%     % choose peak polarity
+%     if strcmp(GABA_TEP(1).peaks{k}(1), 'P')
+%         operation = 'max';
+%     elseif strcmp(GABA_TEP(1).peaks{k}(1), 'N')
+%         operation = 'min';
+%     end
+%     
+%     % loop through electrodes
+%     for e = 1:size(data, 1)
+%         % calculate maximal amplitude
+%         statement = ['peak_value(e) = ' operation '(data(e, :));'];
+%         eval(statement)
+%     end
+%     
+%     % identify three electrodes with the biggest response
+%     for e = 1:eoi_n
+%         statement = ['eoi_value(e) = ' operation '(peak_value);'];
+%         eval(statement)
+%         GABA_tracking(k).eoi.number(e) = find(peak_value == eoi_value(e));
+%         GABA_tracking(k).eoi.name{e} = labels(find(peak_value == eoi_value(e))); 
+%         peak_value(find(peak_value == eoi_value(e))) = 0;
+%     end
+%     
+%     % visualization parameters
+%     x_lim = ((1 + buffer) * GABA_TEP(1).widths(k))/2;
+%     x_eoi = -x_lim:xstep:x_lim;
+%     col = [0.8, 0.11, 0.23; 0.9, 0.24, 0.24; 1, 0.45, 0.45];
+%     
+%     % plot 
+%     fig = figure(figure_counter)
+%     hold on
+%     counter = 1;
+%     for e = 1:size(data, 1)
+%         if any(GABA_tracking(k).eoi.number == e)
+%             P(counter) = plot(x_eoi, data(e, :), 'Color', col(counter, :), 'LineWidth', 2.5);
+%             counter = counter + 1;
+%         else
+%             plot(x_eoi, data(e, :), 'Color', [0.65, 0.65, 0.65], 'LineWidth', 1.5)
+%         end
+%     end
+%     
+%     % add other parameters
+%     title(GABA_TEP(1).peaks{k})
+%     xlabel('time (s)')
+%     ylabel('amplitude (\muV)')
+%     set(gca, 'FontSize', 14)
+%     lgd = legend(P, {cell2mat(GABA_tracking(k).eoi.name{1}) cell2mat(GABA_tracking(k).eoi.name{2}) cell2mat(GABA_tracking(k).eoi.name{3})}, ...
+%         'Location', 'northeast');
+%     lgd.FontSize = 14;
+%     hold off
+%     
+%     % name and save figure
+%     figure_name = ['TEP_' target '_eoi'];
+%     savefig([figure_name])
+%     saveas(fig, [figure_name '.png'])
+%         
+%     % update figure counter
+%     figure_counter = figure_counter + 1 ;
+% end
+% clear k e operation statement fig x_lim x col figure_name lgd P 
 
 % append new variables to the general MATLAB file
-save(filename, 'GABA_tracking', '-append');
-clear seed_electrode seed_peaks buffer eoi_n
+save(filename, 'AGSICI_tracking', 'AGSICI_TEP_avg', '-append');
+clear seed_electrode seed_peaks buffer eoi_n eoi_data
 
 %% functions
 function peak_x = gmfp_plot(x, y, time_window, xstep, labeled, varargin)
@@ -552,11 +599,11 @@ plot(x, y, 'Color', [0 0 0], 'LineWidth', 2.5)
 line([0, 0], yl, 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5)
 
 % find peaks 
-[pks, locs] = findpeaks(y, 'MinPeakDistance', 10, 'MinPeakProminence', 0.01);
+[pks, locs] = findpeaks(y, 'MinPeakDistance', 10, 'MinPeakProminence', 0.015);
 for a = 1:length(locs)
     if time_window(1) + locs(a)*xstep <= 0.015
         idx(a) = false;
-    elseif time_window(1) + locs(a)*xstep > 0.205
+    elseif time_window(1) + locs(a)*xstep > 0.220
         idx(a) = false;        
     else
         idx(a) = true;
@@ -614,11 +661,11 @@ end;
 topoplot(vector2,chanlocs2,varargin{:});
 set(gcf,'color',[1 1 1]);
 end
-function [pos_x, data, sub_data] = track_peak(data, header, time_window, k, TEPs, buffer, seed)
+function [pos_x, data, sub_data] = track_peak(data, header, time_window, k, s, TEP, buffer, seed)
 % figure params 
-figure_name = ['Peak ' TEPs.peaks{k}] ;
-figure_center = TEPs.latencies(k);
-span = ((1 + buffer) * TEPs.widths(k));
+figure_name = ['Subject n. ' num2str(s) ' - peak ' TEP.peak{k}] ;
+figure_center = TEP.center(k);
+span = ((1 + buffer) * TEP.width(k));
 
 % set the peak timepoint manually
 finish = 0;
