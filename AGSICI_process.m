@@ -53,7 +53,7 @@ clear all; clc
 
 % ----- adjustable parameters -----
 % dataset
-subject = [1, 3:8, 10, 12];
+subject = [9, 11, 13:17, 20, 21];
 position = {'along' 'across'}; 
 current = {'normal' 'reversed'};
 intensity = {'stim_100' 'stim_120' 'stim_140'};
@@ -99,6 +99,7 @@ x_end = (time_window(2) - header.xstart)/xstep;
 
 clear c p 
 
+% subject_order = [1, 3:8, 10, 12, 9, 11, 13:17, 20, 21]
 %% 1) load the data
 % load data based on the prefix + conditions
 for p = 1:length(position)
@@ -113,24 +114,26 @@ for p = 1:length(position)
                 end
                 
                 % append the data in the data matrix
-                AGSICI_data(p, c, i, s, :, :) = squeeze(data(:, :, :, :, :, x_start:x_end));
+                A(p, c, i, s, :, :) = squeeze(data(:, :, :, :, :, x_start:x_end));
             end
         end
     end 
 end
-disp(['Datasize: ' num2str(size(AGSICI_data))])
+disp(['Datasize: ' num2str(size(A))])
 clear p c i s data 
 
 % save dataset to the global MATLAB file
 if exist(filename) == 0
     save(filename, 'AGSICI_data');
 else
+    load(filename)
+    AGSICI_data = cat(4, AGSICI_data, A);    
     save(filename, 'AGSICI_data', '-append');
 end
 
 %% 2) preliminary TEP visualization 
 % ----- decide output parameters -----
-electrode = {'Cz'};
+electrode = {'target'};
 y_limits = [-4, 5.5];
 line_type = {':' '-.' '-'};
 % ------------------------------------
@@ -256,7 +259,7 @@ clear e p c fig data_visual P F lgd figure_name CI_visual
 
 % save dataset to the global MATLAB file
 save(filename, 'AGSICI_data_mean', 'AGSICI_data_CI', 'gmfp_data', 'gmfp_CI', '-append');
-clear electrode AGSICI_data_CI gmfp_data gmfp_CI
+clear electrode AGSICI_data_CI 
 
 %% 3) GMFP
 % ----- decide output parameters -----
@@ -391,12 +394,11 @@ clear x_limit x_start_narrow x_end_narrow x_narrow c p k data fig P L R row_coun
 %% 5) peak tracking
 % ----- decide output parameters -----
 seed_electrode = {'target' 'Cz'};                                   % electrode that will be used to set 0 timepoint
-seed_peaks = {1:4; 5:6};                                            % which peeks use which seed electrode
-AGSICI_TEP_avg.peak = {'P25' 'N40' 'P50' 'P75' 'N100' 'P200'};      % choose peak names
-AGSICI_TEP_avg.center = [0.025, 0.04, 0.05, 0.075, 0.110, 0.200];   % choose default peak centers
-AGSICI_TEP_avg.width = [0.02, 0.02, 0.02, 0.04, 0.06, 0.08];        % choose default peak widths
+seed_peaks = {1:2; 3:6};                                            % which peeks use which seed electrode
+AGSICI_TEP_avg.peak = {'P25' 'N40' 'P45' 'P75' 'N120' 'P200'};      % choose peak names
+AGSICI_TEP_avg.center = [0.024, 0.038, 0.047, 0.075, 0.118, 0.200]; % choose default peak centers
+AGSICI_TEP_avg.width = [0.02, 0.02, 0.015, 0.04, 0.06, 0.07];        % choose default peak widths
 buffer = 0.5;                                                       % a margin of the window for peak visualisation 
-eoi_n = 3;                                                          % number of detected EOIs
 % ------------------------------------
 
 % check if numbers match
@@ -407,7 +409,7 @@ end
 % average data across intensities
 for p = 1:length(position)
     for c = 1:length(current)
-        for s = 1:length(subject)
+        for s = 1:size(AGSICI_data, 4)
             % average across intensities
             for e = 1:size(AGSICI_data, 5)
                 for t = 1:size(AGSICI_data, 6)
