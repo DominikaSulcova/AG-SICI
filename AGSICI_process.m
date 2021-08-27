@@ -101,34 +101,34 @@ x_end = (time_window(2) - header.xstart)/xstep;
 clear c p 
 %% 1) load the data
 % load data based on the prefix + conditions
-for p = 1:length(position)
-    for c = 1:length(current)
-        for i = 1:length(intensity)
-            for s = 1:length(subject)
-                % load individual data from letswave
-                if subject(s) < 10
-                    load([prefix ' 0' num2str(subject(s)) ' ' position{p} ' ' current{c} ' ' intensity{i} '.mat'])
-                else
-                    load([prefix ' ' num2str(subject(s)) ' ' position{p} ' ' current{c} ' ' intensity{i} '.mat'])
-                end
-                
-                % append the data in the data matrix
-                A(p, c, i, s, :, :) = squeeze(data(:, :, :, :, :, x_start:x_end));
-            end
-        end
-    end 
-end
-disp(['Datasize: ' num2str(size(A))])
-clear p c i s data 
-
-% save dataset to the global MATLAB file
-if exist(filename) == 0
-    save(filename, 'AGSICI_data');
-else
-    load(filename)
-    AGSICI_data = cat(4, AGSICI_data, A);    
-    save(filename, 'AGSICI_data', '-append');
-end
+% for p = 1:length(position)
+%     for c = 1:length(current)
+%         for i = 1:length(intensity)
+%             for s = 1:length(subject)
+%                 % load individual data from letswave
+%                 if subject(s) < 10
+%                     load([prefix ' 0' num2str(subject(s)) ' ' position{p} ' ' current{c} ' ' intensity{i} '.mat'])
+%                 else
+%                     load([prefix ' ' num2str(subject(s)) ' ' position{p} ' ' current{c} ' ' intensity{i} '.mat'])
+%                 end
+%                 
+%                 % append the data in the data matrix
+%                 A(p, c, i, s, :, :) = squeeze(data(:, :, :, :, :, x_start:x_end));
+%             end
+%         end
+%     end 
+% end
+% disp(['Datasize: ' num2str(size(A))])
+% clear p c i s data 
+% 
+% % save dataset to the global MATLAB file
+% if exist(filename) == 0
+%     save(filename, 'AGSICI_data');
+% else
+%     load(filename)
+%     AGSICI_data = cat(4, AGSICI_data, A);    
+%     save(filename, 'AGSICI_data', '-append');
+% end
 
 %% 2) preliminary TEP visualization 
 % ----- decide output parameters -----
@@ -136,6 +136,8 @@ electrode = {'target'};
 y_limits = [-4, 5.5];
 line_type = {':' '-.' '-'};
 % ------------------------------------
+% read saved data
+load(filename)
 
 % average data, calculate CI
 for p = 1:length(position)
@@ -394,7 +396,7 @@ clear x_limit x_start_narrow x_end_narrow x_narrow c p k data fig P L R row_coun
 % ----- decide output parameters -----
 seed_electrode = {'target' 'Cz'};                                   % electrode that will be used to set 0 timepoint
 seed_peaks = {1:2; 3:6};                                            % which peeks use which seed electrode
-AGSICI_TEP_avg.peak = {'P25' 'N40' 'P50' 'P75' 'N120' 'P200'};      % choose peak names
+AGSICI_TEP_avg.peak = {'P25' 'N40' 'P50' 'P75' 'N100' 'P180'};      % choose peak names
 AGSICI_TEP_avg.center = [0.024, 0.038, 0.047, 0.075, 0.118, 0.200]; % choose default peak centers
 AGSICI_TEP_avg.width = [0.02, 0.02, 0.015, 0.04, 0.06, 0.07];        % choose default peak widths
 buffer = 0.5;                                                       % a margin of the window for peak visualisation 
@@ -476,6 +478,8 @@ for k = 1:length(AGSICI_TEP_avg.peak)
 end
 clear seed answer s_index a k p c e data statement peak_center data_c data_c_sub 
 
+save()
+
 % average across subjects, save for letswave
 for k = 1:length(AGSICI_TEP_avg.peak)    
     % fill in peak name 
@@ -505,12 +509,12 @@ for k = 1:length(AGSICI_TEP_avg.peak)
             for e = 1:size(data_i, 2)
                 for i = 1:size(data_i, 3)
                     data(1, e, 1, 1, 1, i) =  mean(squeeze(data_i(:, e, i)));         
-                    AGSICI_eoi(k).data(p, c, e, i) = mean(squeeze(data_i(:, e, i)));        
+                    AGSICI_eoi(k).data_2(p, c, e, i) = mean(squeeze(data_i(:, e, i)));        
                 end
             end
 
             % save for LW
-            fname = ['AGSICI TEP tracked ' position{p} ' ' current{c} ' '  AGSICI_TEP_avg.peak{k} ' centered'];
+            fname = ['AGSICI TEP tracked_2 ' position{p} ' ' current{c} ' '  AGSICI_TEP_avg.peak{k} ' centered'];
             header.name = fname; 
             header.datasize(6) = size(data, 6);
             span = (1 + buffer) * AGSICI_TEP_avg.width(k);
@@ -528,12 +532,12 @@ for k = 1:length(AGSICI_TEP_avg.peak)
             for e = 1:size(data_i, 2)
                 for i = 1:size(data_i, 3)
                     data(1, e, 1, 1, 1, i) =  mean(squeeze(data_i(:, e, i)));         
-                    AGSICI_eoi(k).data(e, i) = mean(squeeze((:, e, i)));        
+                    AGSICI_eoi(k).data_2(e, i) = mean(squeeze((:, e, i)));        
                 end
             end
 
             % save for LW
-            fname = ['AGSICI TEP tracked ' position{p} ' ' current{c} ' '  AGSICI_TEP_avg.peak{k} ' subtracted'];
+            fname = ['AGSICI TEP tracked_2 ' position{p} ' ' current{c} ' '  AGSICI_TEP_avg.peak{k} ' subtracted'];
             header.name = fname; 
             save([fname '.mat'], 'data');
             save([fname '.lw6'], 'header');    
