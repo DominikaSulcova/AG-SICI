@@ -53,8 +53,8 @@ clear all; clc
 
 % ----- adjustable parameters -----
 % dataset
-subject = [9, 11, 13:17, 20, 21];
-subject_order = [1, 3:8, 10, 12, 9, 11, 13:17, 20, 21];
+subject = [9, 11, 13:18, 20, 21];
+subject_order = [1, 3:8, 10, 12, 9, 11, 13:18, 20, 21];
 position = {'along' 'across'}; 
 current = {'normal' 'reversed'};
 intensity = {'stim_100' 'stim_120' 'stim_140'};
@@ -100,35 +100,36 @@ x_end = (time_window(2) - header.xstart)/xstep;
 
 clear c p 
 %% 1) load the data
-% load data based on the prefix + conditions
-% for p = 1:length(position)
-%     for c = 1:length(current)
-%         for i = 1:length(intensity)
-%             for s = 1:length(subject)
-%                 % load individual data from letswave
-%                 if subject(s) < 10
-%                     load([prefix ' 0' num2str(subject(s)) ' ' position{p} ' ' current{c} ' ' intensity{i} '.mat'])
-%                 else
-%                     load([prefix ' ' num2str(subject(s)) ' ' position{p} ' ' current{c} ' ' intensity{i} '.mat'])
-%                 end
-%                 
-%                 % append the data in the data matrix
-%                 A(p, c, i, s, :, :) = squeeze(data(:, :, :, :, :, x_start:x_end));
-%             end
-%         end
-%     end 
-% end
-% disp(['Datasize: ' num2str(size(A))])
-% clear p c i s data 
-% 
-% % save dataset to the global MATLAB file
-% if exist(filename) == 0
-%     save(filename, 'AGSICI_data');
-% else
-%     load(filename)
-%     AGSICI_data = cat(4, AGSICI_data, A);    
-%     save(filename, 'AGSICI_data', '-append');
-% end
+load data based on the prefix + conditions
+for p = 1:length(position)
+    for c = 1:length(current)
+        for i = 1:length(intensity)
+            for s = 1:length(subject)
+                % load individual data from letswave
+                if subject(s) < 10
+                    load([prefix ' 0' num2str(subject(s)) ' ' position{p} ' ' current{c} ' ' intensity{i} '.mat'])
+                else
+                    load([prefix ' ' num2str(subject(s)) ' ' position{p} ' ' current{c} ' ' intensity{i} '.mat'])
+                end
+                
+                % append the data in the data matrix
+                A(p, c, i, s, :, :) = squeeze(data(:, :, :, :, :, x_start:x_end));
+            end
+        end
+    end 
+end
+disp(['Datasize: ' num2str(size(A))])
+clear p c i s data 
+
+% save dataset to the global MATLAB file
+if exist(filename) == 0
+    AGSICI_data = A;
+    save(filename, 'AGSICI_data');
+else
+    load(filename)
+    AGSICI_data = cat(4, AGSICI_data, A);    
+    save(filename, 'AGSICI_data', '-append');
+end
 
 %% 2) preliminary TEP visualization 
 % ----- decide output parameters -----
@@ -401,8 +402,6 @@ AGSICI_TEP_avg.center = [0.024, 0.038, 0.047, 0.075, 0.118, 0.200]; % choose def
 AGSICI_TEP_avg.width = [0.02, 0.02, 0.015, 0.04, 0.06, 0.07];        % choose default peak widths
 buffer = 0.5;                                                       % a margin of the window for peak visualisation 
 % ------------------------------------
-% loads previously saved variables
-load(filename)
 
 % check if numbers match
 if numel(seed_electrode) ~= numel(seed_peaks)
@@ -411,13 +410,14 @@ end
 
 % select data to process
 index = ismember(subject_order, subject);
+AGSICI_data_subset = AGSICI_data(:, :, :, index, :, :);
 for p = 1:length(position)
-    for c = 1:length(current)
-        for s = 1:size(AGSICI_data(:, :, :, index, :, :), 4)
+    for c = 1:length(current)     
+        for s = 1:size(AGSICI_data_subset, 4)
             % average across intensities
             for e = 1:size(AGSICI_data, 5)
                 for t = 1:size(AGSICI_data, 6)
-                    eoi_data(p, c, s, e, t) = mean(squeeze(AGSICI_data(p, c, :, s, e, t)));
+                    eoi_data(p, c, s, e, t) = mean(squeeze(AGSICI_data_subset(p, c, :, s, e, t)));
                 end
             end 
         end        
@@ -509,7 +509,7 @@ for k = 1:length(AGSICI_TEP_avg.peak)
             for e = 1:size(data_i, 2)
                 for i = 1:size(data_i, 3)
                     data(1, e, 1, 1, 1, i) =  mean(squeeze(data_i(:, e, i)));         
-                    AGSICI_eoi(k).data_2(p, c, e, i) = mean(squeeze(data_i(:, e, i)));        
+                    AGSICI_eoi(k).data_centred(p, c, e, i) = mean(squeeze(data_i(:, e, i)));        
                 end
             end
 
@@ -532,7 +532,7 @@ for k = 1:length(AGSICI_TEP_avg.peak)
             for e = 1:size(data_i, 2)
                 for i = 1:size(data_i, 3)
                     data(1, e, 1, 1, 1, i) =  mean(squeeze(data_i(:, e, i)));         
-                    AGSICI_eoi(k).data_2(e, i) = mean(squeeze((:, e, i)));        
+                    AGSICI_eoi(k).data_sub(p, c, e, i) = mean(squeeze((:, e, i)));        
                 end
             end
 
@@ -551,289 +551,289 @@ clear k p c s e i data_name  statement fname span
 save(filename, 'AGSICI_TEP_avg',  'AGSICI_TEP_subject', 'AGSICI_eoi', '-append');
 clear seed_electrode seed_peaks buffer eoi_n eoi_data 
 
-%% 6) amplitude
-% ----- decide output parameters -----
-POI = {'P25' 'N40'};                                % 2 peaks of interest
-EOI = {'target' 'target'};                          % 2 electrodes of interest
-percent = 25;                                       % % of timepoints included in the mean amplitude calculation
-% ------------------------------------
-
-% loop through subjects and conditions
-% p = 1; c = 1; s = 1; i = 1; k = 1;
-for s = 1:length(subject) 
-    for p = 1:length(position)  
-        for c = 1:length(current)
-            % setup names   
-            figure_title = ['Subject n. ' num2str(subject(s)) ' : ' position{p} ' STS, ' current{c} ' current'];                                       
-            if subject(s) < 10
-                file_name = ['AG-SICI_amplitude_S0' num2str(subject(s)) '_' position{p} '_' current{c}];
-            else
-                file_name = ['AG-SICI_amplitude_S' num2str(subject(s)) '_' position{p} '_' current{c}];
-            end
-            
-            % launch summary figure 
-            if figure_counter < 3
-                figure_counter = 3;
-            end
-            fig = figure(figure_counter); 
-                        
-            % loop through intensities
-            for i = 1:length(intensity)
-                % loop through peaks
-                for k = 1:length(POI)                      
-                    % choose TEP data 
-                    peak_n = find(contains(AGSICI_TEP_avg.peak, POI{k}));
-                    electrode_n = find(contains(labels, EOI{peak_n}));
-                    data_visual = double(squeeze(AGSICI_data(p, c, i, s, electrode_n, :))); 
-                    
-                    % choose data for topoplot 
-                    for e = 1:size(AGSICI_data, 5)
-                        data_topoplot(1, e, 1, 1, 1, :) = squeeze(AGSICI_data(p, c, i, s, e, :));
-                    end
-
-                    % define default TOI 
-                    center = AGSICI_TEP_subject(s).latency(p, c, peak_n);
-                    span = AGSICI_TEP_avg.width(peak_n);
-                    
-                    % set the final TOI
-                    finish = 0;
-                    while finish == 0;
-                        % launch the figure
-                        fig_1 = figure(1); 
-                        hold on                      
-                        
-                        % plot the background 
-                        subplot(4, 6, [7:24]); 
-                        plot(x, data_visual, 'b:', 'LineWidth', 0.5)
-                        yl = ylim; yl = [yl(1) - 0.2, yl(2) + 0.2]; ylim(yl)
-                        xlim([time_window(1), time_window(2)])
-                        rectangle('Position', [0, yl(1), 0.01, yl(2)-yl(1)], 'FaceColor', [0.9020    0.9020    0.9020], 'EdgeColor', 'none')
-                        title([figure_title ' : ' POI{k}], 'FontSize', 16)
-                        set(gcf,'units','normalized','outerposition',[0 0 1 1])
-
-                        % set limits for topoplot colourmap
-                        map_lims = yl;
-                        
-                        % visualize default peak TOI
-                        subplot(4, 6, [7:24])
-                        rectangle('Position', [center - span/2, yl(1), span, yl(2)-yl(1)], 'FaceColor', [1,0.7608,0.7608], 'EdgeColor', 'none')
-
-                        % define the polarity of current peak 
-                        switch POI{k}(1)
-                            case 'P'
-                                polarity = 'positive';
-                            case 'N'
-                                polarity = 'negative';
-                        end  
-                        
-                        % calculate mean amplitude
-                        [amplitude, averaged_x, averaged_data] = TEP_amplitude(data_visual', polarity, center, span, percent, xstep, time_window(1)); 
-
-                        % calculate  real peak latency (round up)
-                        central_latency = averaged_x(ceil(length(averaged_x)/2));
-
-                        % update the figure
-                        subplot(4, 6, [7:24])
-                        for a = 1:length(averaged_x)
-                            line([averaged_x(a), averaged_x(a)], [0, averaged_data(a)], 'Color', 'red', 'LineWidth', 1)
-                            hold on
-                        end
-                        
-                        % add the topoplot    
-                        subplot(4, 6, 1);
-                        topo_plot(header, data_topoplot, central_latency, time_window(1), map_lims) 
-                        hold on 
-                        
-                        % replot the data to make it visible
-                        subplot(4, 6, [7:24])
-                        plot(x, data_visual, 'b', 'LineWidth', 2.5)
-                        line([0, 0], yl, 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5)
-                        line(x, zeros(length(x)), 'LineStyle', ':', 'Color', [0, 0, 0], 'LineWidth', 1)
-                        hold on
-                        
-                        % ask for approval
-                        answer = questdlg('Do you want to proceed?', POI{k},...
-                            'Yes, extract outcome values.', 'No, I will adjust TOI manually.', 'Yes, extract outcome values.');
-                        
-                        % switch action
-                        switch answer
-                            case 'Yes, extract outcome values.'
-                                % close the figure
-                                close(fig_1)
-                                
-                                % exit the while loop
-                                finish = 1;
-
-                            case 'No, I will adjust TOI manually.'
-                                % assign previous center and span
-                                choose_center = center;  
-                                choose_span = 2 * span;  
-
-                                % identify the limits for visualisation of current peak
-                                choose_x1 = ceil((choose_center - choose_span/2 - time_window(1)) / xstep);
-                                choose_x2 = ceil((choose_center + choose_span/2 - time_window(1)) / xstep);
-                                choose_x = (choose_center - choose_span/2) : xstep : (choose_center + choose_span/2);
-
-                                % prepare data and header for visualization
-                                choose_data = double(squeeze(AGSICI_data(p, c, i, s, electrode_n, choose_x1 : choose_x2)));
-                                choose_header = header;
-                                choose_header.datasize(6) = length(choose_data);  
-                                choose_header.xstart = choose_center - choose_span/2;
-                                
-                                % check if vector size matches
-                                if length(choose_data) ~= length(choose_x)
-                                    diff = length(choose_data) - length(choose_x);
-                                    if diff > 0
-                                        choose_data = choose_data(1:end - diff);
-                                    elseif diff < 0
-                                        choose_x = choose_x(1:end + diff);
-                                    end
-                                end
-
-                                % launch the choosing figure                 
-                                choose_figure_name = ['Choose manually peak ' POI{k}];
-                                choose_axesHandles = [];
-                                choose_fig = figure(2);   
-                                choose_axesHandles = [choose_axesHandles subplot(3, 3, [4:9])];  
-                                plot(choose_x, choose_data, 'LineWidth', 2)
-                                xlim([(choose_center - choose_span/2), (choose_center + choose_span/2)])
-                                title(choose_figure_name, 'FontSize', 16)
-                                hold on                
-
-                                % plot the line at the center
-                                l = line([choose_center, choose_center], get(gca,'ylim'), 'Color', 'red', 'LineWidth', 2, 'LineStyle', '--'); 
-                                hold on    
-
-                                % plot the central topography 
-                                choose_map_lims = get(choose_axesHandles(1), 'ylim');
-                                choose_axesHandles = [choose_axesHandles subplot(3, 3, 2)];
-                                topo_plot(header, data_topoplot, choose_center, time_window(1), choose_map_lims);
-                                hold on            
-
-                                % choose the peak position
-                                pos_x = get_position(choose_axesHandles);  
-
-                                % update the figure
-                                set (choose_fig, 'WindowButtonMotionFcn', '');
-                                subplot(3, 3, [4:9])
-                                set(l, 'XData', [pos_x, pos_x], 'LineStyle', '-');
-                                subplot(3, 3, 2) 
-                                cla(choose_axesHandles(2))
-                                topo_plot(header, data_topoplot, pos_x, time_window(1), choose_map_lims);
-                                hold off
-
-                                % update the central latency
-                                center = pos_x;
-
-                                % close the choosing figure
-                                pause(2)
-                                close(choose_fig)
-
-                                % close the the main figure
-                                close(fig_1)
-                        end
-                    end
-                    clear fig_1 choose_header choose_map_lims choose_span choose_x choose_x1 choose_x2 l
-                    
-                    % record outcome variables
-                    AGSICI_TEP_subject(s).latency_real(p, c, i, k) = central_latency;  
-                    AGSICI_TEP_subject(s).amplitude(p, c, i, k) = amplitude; 
-                                        
-                    % set up figure
-                    r = (i - 1)*6;
-                    f = (1 + 3 * (k - 1) + r);
-                    h = (2 + 3 * (k - 1) + r);  
-                    g = (3 + 3 * (k - 1) + r); 
-                                        
-                    % plot the data
-                    figure(fig)
-                    hold on
-                    
-                    %plot the data
-                    subplot(length(intensity), 6, [f, h])
-                    plot(x, data_visual, 'b:', 'LineWidth', 0.5)
-                    yl = ylim; yl = [yl(1) - 0.2, yl(2) + 0.2]; ylim(yl)
-                    xlim([time_window(1), time_window(2)])
-                    rectangle('Position', [0, yl(1), 0.01, yl(2)-yl(1)], 'FaceColor', [0.9020    0.9020    0.9020], 'EdgeColor', 'none')
-                    title([intensity{i}(end-2 : end) ' % rMT - ' POI{k}], 'FontSize', 16)
-                    set(gcf,'units','normalized','outerposition',[0 0 1 1])
-                    
-                    % set limits for topoplot colourmap
-                    map_lims = yl;
-
-                    % visualize final peak TOI
-                    rectangle('Position', [center - span/2, yl(1), span, yl(2)-yl(1)], 'FaceColor', [1,0.7608,0.7608], 'EdgeColor', 'none')
-                    
-                    % update the figure
-                    subplot(length(intensity), 6, [f, h])
-                    for a = 1:length(averaged_x)
-                        line([averaged_x(a), averaged_x(a)], [0, averaged_data(a)], 'Color', 'red', 'LineWidth', 1)
-                        hold on
-                    end
-
-                    % add the topoplot    
-                    subplot(length(intensity), 6, g);
-                    topo_plot(header, data_topoplot, central_latency, time_window(1), map_lims);
-                    hold on 
-
-                    % replot the data to make it visible
-                    subplot(length(intensity), 6, [f, h])
-                    plot(x, data_visual, 'b', 'LineWidth', 2)
-                    line([0, 0], get(gca,'ylim'), 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2)
-                    line(x, zeros(length(x)), 'LineStyle', ':', 'Color', [0, 0, 0], 'LineWidth', 1)                                     
-                end                                       
-            end
-            
-            % save the summary figure, close
-            figure(fig)
-            sgtitle(figure_title)  
-            hold off
-            savefig(fig, [file_name '.fig'])
-            saveas(fig, [file_name '.png'])
-            close(fig)
-
-            % update the figure counter
-            figure_counter = figure_counter + 1;   
-        end
-    end
-    % play a celebratory sound at the end of each participant
-    tune = load('handel.mat');
-    sound(tune.y, tune.Fs)
-end
-clear p c i s k e a f g h r electrode_n peak_n figure_title file_name data_visual data_topoplot ...
-    center span fig yl map_lims polarity amplitude averaged_x averaged_data central_latency...
-    finish answer choose_fig choose_axesHandles choose_center choose_data choose_figure_name pos_x tune    
-
-% save data in a R-compatible table 
-AGSICI_outcome = table;
-row_counter = 1;
-for s = 1:length(subject) 
-    for p = 1:length(position)  
-        for c = 1:length(current)
-            for i = 1:length(intensity)
-                for k = 1:length(POI) 
-                    %fill in the table
-                    AGSICI_outcome.subject(row_counter) = subject(s);
-                    AGSICI_outcome.position(row_counter) = position(p);
-                    AGSICI_outcome.current(row_counter) = current(c);
-                    AGSICI_outcome.intensity(row_counter) = str2double(intensity{i}(end-2 : end));
-                    AGSICI_outcome.peak(row_counter) = POI(k);
-                    AGSICI_outcome.amplitude(row_counter) = AGSICI_TEP_subject(s).amplitude(p, c, i, k);
-                    AGSICI_outcome.latency(row_counter) = AGSICI_TEP_subject(s).latency_real(p, c, i, k);
-                    
-                    % update the counter
-                    row_counter = row_counter + 1;
-                end
-            end
-        end
-    end
-end
-clear s p c i k row_counter
-writetable(AGSICI_outcome, 'AGSICI_outcome.csv')
-
-% append new variables to the general MATLAB file
-save(filename, 'AGSICI_TEP_subject', 'AGSICI_outcome', '-append');
-clear POI EOI percent
+% %% 6) amplitude
+% % ----- decide output parameters -----
+% POI = {'P25' 'N40'};                                % 2 peaks of interest
+% EOI = {'target' 'target'};                          % 2 electrodes of interest
+% percent = 25;                                       % % of timepoints included in the mean amplitude calculation
+% % ------------------------------------
+% 
+% % loop through subjects and conditions
+% % p = 1; c = 1; s = 1; i = 1; k = 1;
+% for s = 1:length(subject) 
+%     for p = 1:length(position)  
+%         for c = 1:length(current)
+%             % setup names   
+%             figure_title = ['Subject n. ' num2str(subject(s)) ' : ' position{p} ' STS, ' current{c} ' current'];                                       
+%             if subject(s) < 10
+%                 file_name = ['AG-SICI_amplitude_S0' num2str(subject(s)) '_' position{p} '_' current{c}];
+%             else
+%                 file_name = ['AG-SICI_amplitude_S' num2str(subject(s)) '_' position{p} '_' current{c}];
+%             end
+%             
+%             % launch summary figure 
+%             if figure_counter < 3
+%                 figure_counter = 3;
+%             end
+%             fig = figure(figure_counter); 
+%                         
+%             % loop through intensities
+%             for i = 1:length(intensity)
+%                 % loop through peaks
+%                 for k = 1:length(POI)                      
+%                     % choose TEP data 
+%                     peak_n = find(contains(AGSICI_TEP_avg.peak, POI{k}));
+%                     electrode_n = find(contains(labels, EOI{peak_n}));
+%                     data_visual = double(squeeze(AGSICI_data(p, c, i, s, electrode_n, :))); 
+%                     
+%                     % choose data for topoplot 
+%                     for e = 1:size(AGSICI_data, 5)
+%                         data_topoplot(1, e, 1, 1, 1, :) = squeeze(AGSICI_data(p, c, i, s, e, :));
+%                     end
+% 
+%                     % define default TOI 
+%                     center = AGSICI_TEP_subject(s).latency(p, c, peak_n);
+%                     span = AGSICI_TEP_avg.width(peak_n);
+%                     
+%                     % set the final TOI
+%                     finish = 0;
+%                     while finish == 0;
+%                         % launch the figure
+%                         fig_1 = figure(1); 
+%                         hold on                      
+%                         
+%                         % plot the background 
+%                         subplot(4, 6, [7:24]); 
+%                         plot(x, data_visual, 'b:', 'LineWidth', 0.5)
+%                         yl = ylim; yl = [yl(1) - 0.2, yl(2) + 0.2]; ylim(yl)
+%                         xlim([time_window(1), time_window(2)])
+%                         rectangle('Position', [0, yl(1), 0.01, yl(2)-yl(1)], 'FaceColor', [0.9020    0.9020    0.9020], 'EdgeColor', 'none')
+%                         title([figure_title ' : ' POI{k}], 'FontSize', 16)
+%                         set(gcf,'units','normalized','outerposition',[0 0 1 1])
+% 
+%                         % set limits for topoplot colourmap
+%                         map_lims = yl;
+%                         
+%                         % visualize default peak TOI
+%                         subplot(4, 6, [7:24])
+%                         rectangle('Position', [center - span/2, yl(1), span, yl(2)-yl(1)], 'FaceColor', [1,0.7608,0.7608], 'EdgeColor', 'none')
+% 
+%                         % define the polarity of current peak 
+%                         switch POI{k}(1)
+%                             case 'P'
+%                                 polarity = 'positive';
+%                             case 'N'
+%                                 polarity = 'negative';
+%                         end  
+%                         
+%                         % calculate mean amplitude
+%                         [amplitude, averaged_x, averaged_data] = TEP_amplitude(data_visual', polarity, center, span, percent, xstep, time_window(1)); 
+% 
+%                         % calculate  real peak latency (round up)
+%                         central_latency = averaged_x(ceil(length(averaged_x)/2));
+% 
+%                         % update the figure
+%                         subplot(4, 6, [7:24])
+%                         for a = 1:length(averaged_x)
+%                             line([averaged_x(a), averaged_x(a)], [0, averaged_data(a)], 'Color', 'red', 'LineWidth', 1)
+%                             hold on
+%                         end
+%                         
+%                         % add the topoplot    
+%                         subplot(4, 6, 1);
+%                         topo_plot(header, data_topoplot, central_latency, time_window(1), map_lims) 
+%                         hold on 
+%                         
+%                         % replot the data to make it visible
+%                         subplot(4, 6, [7:24])
+%                         plot(x, data_visual, 'b', 'LineWidth', 2.5)
+%                         line([0, 0], yl, 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5)
+%                         line(x, zeros(length(x)), 'LineStyle', ':', 'Color', [0, 0, 0], 'LineWidth', 1)
+%                         hold on
+%                         
+%                         % ask for approval
+%                         answer = questdlg('Do you want to proceed?', POI{k},...
+%                             'Yes, extract outcome values.', 'No, I will adjust TOI manually.', 'Yes, extract outcome values.');
+%                         
+%                         % switch action
+%                         switch answer
+%                             case 'Yes, extract outcome values.'
+%                                 % close the figure
+%                                 close(fig_1)
+%                                 
+%                                 % exit the while loop
+%                                 finish = 1;
+% 
+%                             case 'No, I will adjust TOI manually.'
+%                                 % assign previous center and span
+%                                 choose_center = center;  
+%                                 choose_span = 2 * span;  
+% 
+%                                 % identify the limits for visualisation of current peak
+%                                 choose_x1 = ceil((choose_center - choose_span/2 - time_window(1)) / xstep);
+%                                 choose_x2 = ceil((choose_center + choose_span/2 - time_window(1)) / xstep);
+%                                 choose_x = (choose_center - choose_span/2) : xstep : (choose_center + choose_span/2);
+% 
+%                                 % prepare data and header for visualization
+%                                 choose_data = double(squeeze(AGSICI_data(p, c, i, s, electrode_n, choose_x1 : choose_x2)));
+%                                 choose_header = header;
+%                                 choose_header.datasize(6) = length(choose_data);  
+%                                 choose_header.xstart = choose_center - choose_span/2;
+%                                 
+%                                 % check if vector size matches
+%                                 if length(choose_data) ~= length(choose_x)
+%                                     diff = length(choose_data) - length(choose_x);
+%                                     if diff > 0
+%                                         choose_data = choose_data(1:end - diff);
+%                                     elseif diff < 0
+%                                         choose_x = choose_x(1:end + diff);
+%                                     end
+%                                 end
+% 
+%                                 % launch the choosing figure                 
+%                                 choose_figure_name = ['Choose manually peak ' POI{k}];
+%                                 choose_axesHandles = [];
+%                                 choose_fig = figure(2);   
+%                                 choose_axesHandles = [choose_axesHandles subplot(3, 3, [4:9])];  
+%                                 plot(choose_x, choose_data, 'LineWidth', 2)
+%                                 xlim([(choose_center - choose_span/2), (choose_center + choose_span/2)])
+%                                 title(choose_figure_name, 'FontSize', 16)
+%                                 hold on                
+% 
+%                                 % plot the line at the center
+%                                 l = line([choose_center, choose_center], get(gca,'ylim'), 'Color', 'red', 'LineWidth', 2, 'LineStyle', '--'); 
+%                                 hold on    
+% 
+%                                 % plot the central topography 
+%                                 choose_map_lims = get(choose_axesHandles(1), 'ylim');
+%                                 choose_axesHandles = [choose_axesHandles subplot(3, 3, 2)];
+%                                 topo_plot(header, data_topoplot, choose_center, time_window(1), choose_map_lims);
+%                                 hold on            
+% 
+%                                 % choose the peak position
+%                                 pos_x = get_position(choose_axesHandles);  
+% 
+%                                 % update the figure
+%                                 set (choose_fig, 'WindowButtonMotionFcn', '');
+%                                 subplot(3, 3, [4:9])
+%                                 set(l, 'XData', [pos_x, pos_x], 'LineStyle', '-');
+%                                 subplot(3, 3, 2) 
+%                                 cla(choose_axesHandles(2))
+%                                 topo_plot(header, data_topoplot, pos_x, time_window(1), choose_map_lims);
+%                                 hold off
+% 
+%                                 % update the central latency
+%                                 center = pos_x;
+% 
+%                                 % close the choosing figure
+%                                 pause(2)
+%                                 close(choose_fig)
+% 
+%                                 % close the the main figure
+%                                 close(fig_1)
+%                         end
+%                     end
+%                     clear fig_1 choose_header choose_map_lims choose_span choose_x choose_x1 choose_x2 l
+%                     
+%                     % record outcome variables
+%                     AGSICI_TEP_subject(s).latency_real(p, c, i, k) = central_latency;  
+%                     AGSICI_TEP_subject(s).amplitude(p, c, i, k) = amplitude; 
+%                                         
+%                     % set up figure
+%                     r = (i - 1)*6;
+%                     f = (1 + 3 * (k - 1) + r);
+%                     h = (2 + 3 * (k - 1) + r);  
+%                     g = (3 + 3 * (k - 1) + r); 
+%                                         
+%                     % plot the data
+%                     figure(fig)
+%                     hold on
+%                     
+%                     %plot the data
+%                     subplot(length(intensity), 6, [f, h])
+%                     plot(x, data_visual, 'b:', 'LineWidth', 0.5)
+%                     yl = ylim; yl = [yl(1) - 0.2, yl(2) + 0.2]; ylim(yl)
+%                     xlim([time_window(1), time_window(2)])
+%                     rectangle('Position', [0, yl(1), 0.01, yl(2)-yl(1)], 'FaceColor', [0.9020    0.9020    0.9020], 'EdgeColor', 'none')
+%                     title([intensity{i}(end-2 : end) ' % rMT - ' POI{k}], 'FontSize', 16)
+%                     set(gcf,'units','normalized','outerposition',[0 0 1 1])
+%                     
+%                     % set limits for topoplot colourmap
+%                     map_lims = yl;
+% 
+%                     % visualize final peak TOI
+%                     rectangle('Position', [center - span/2, yl(1), span, yl(2)-yl(1)], 'FaceColor', [1,0.7608,0.7608], 'EdgeColor', 'none')
+%                     
+%                     % update the figure
+%                     subplot(length(intensity), 6, [f, h])
+%                     for a = 1:length(averaged_x)
+%                         line([averaged_x(a), averaged_x(a)], [0, averaged_data(a)], 'Color', 'red', 'LineWidth', 1)
+%                         hold on
+%                     end
+% 
+%                     % add the topoplot    
+%                     subplot(length(intensity), 6, g);
+%                     topo_plot(header, data_topoplot, central_latency, time_window(1), map_lims);
+%                     hold on 
+% 
+%                     % replot the data to make it visible
+%                     subplot(length(intensity), 6, [f, h])
+%                     plot(x, data_visual, 'b', 'LineWidth', 2)
+%                     line([0, 0], get(gca,'ylim'), 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2)
+%                     line(x, zeros(length(x)), 'LineStyle', ':', 'Color', [0, 0, 0], 'LineWidth', 1)                                     
+%                 end                                       
+%             end
+%             
+%             % save the summary figure, close
+%             figure(fig)
+%             sgtitle(figure_title)  
+%             hold off
+%             savefig(fig, [file_name '.fig'])
+%             saveas(fig, [file_name '.png'])
+%             close(fig)
+% 
+%             % update the figure counter
+%             figure_counter = figure_counter + 1;   
+%         end
+%     end
+%     % play a celebratory sound at the end of each participant
+%     tune = load('handel.mat');
+%     sound(tune.y, tune.Fs)
+% end
+% clear p c i s k e a f g h r electrode_n peak_n figure_title file_name data_visual data_topoplot ...
+%     center span fig yl map_lims polarity amplitude averaged_x averaged_data central_latency...
+%     finish answer choose_fig choose_axesHandles choose_center choose_data choose_figure_name pos_x tune    
+% 
+% % save data in a R-compatible table 
+% AGSICI_outcome = table;
+% row_counter = 1;
+% for s = 1:length(subject) 
+%     for p = 1:length(position)  
+%         for c = 1:length(current)
+%             for i = 1:length(intensity)
+%                 for k = 1:length(POI) 
+%                     %fill in the table
+%                     AGSICI_outcome.subject(row_counter) = subject(s);
+%                     AGSICI_outcome.position(row_counter) = position(p);
+%                     AGSICI_outcome.current(row_counter) = current(c);
+%                     AGSICI_outcome.intensity(row_counter) = str2double(intensity{i}(end-2 : end));
+%                     AGSICI_outcome.peak(row_counter) = POI(k);
+%                     AGSICI_outcome.amplitude(row_counter) = AGSICI_TEP_subject(s).amplitude(p, c, i, k);
+%                     AGSICI_outcome.latency(row_counter) = AGSICI_TEP_subject(s).latency_real(p, c, i, k);
+%                     
+%                     % update the counter
+%                     row_counter = row_counter + 1;
+%                 end
+%             end
+%         end
+%     end
+% end
+% clear s p c i k row_counter
+% writetable(AGSICI_outcome, 'AGSICI_outcome.csv')
+% 
+% % append new variables to the general MATLAB file
+% save(filename, 'AGSICI_TEP_subject', 'AGSICI_outcome', '-append');
+% clear POI EOI percent
 
 %% functions
 function peak_x = gmfp_plot(x, y, time_window, xstep, labeled, varargin)
