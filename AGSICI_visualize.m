@@ -15,7 +15,7 @@ clear all; clc
 
 % ----- adjustable parameters -----
 % dataset
-subject = [1, 3:8, 10, 12];
+subject = [1, 3:18, 20, 21];
 position = {'along' 'across'}; 
 current = {'normal' 'reversed'};
 intensity = [100, 120, 140];
