@@ -23,8 +23,8 @@ subject = [1, 3:18, 20, 21];
 position = {'along' 'across'}; 
 current = {'normal' 'reversed'};
 intensity = [100, 120, 140];
-peak = {'P25' 'N40'};
-filename = 'AG-SICI_P1_final.mat';
+peak = {'N45'};
+filename = 'AG-SICI.mat';
 
 % statistics 
 z = 1.96;
@@ -63,7 +63,7 @@ load(filename, 'AGSICI_TEP_subject');
 for p = 1:length(position)
     for c = 1:length(current)
         for i = 1:length(intensity)
-            for k = 1:length(peak)
+            for k = length(peak)
                 % extract individual data 
                 for s = 1:length(subject)
                     amplitude(p, c, i, k, s) = AGSICI_TEP_subject(s).amplitude(p, c, i, k);

@@ -555,9 +555,9 @@ clear x_limit x_start_narrow x_end_narrow x_narrow c p k data fig P L R row_coun
 
 %% 6) amplitude
 % ----- decide output parameters -----
-POI = {'P25' 'N40'};                                % 2 peaks of interest
-EOI = {'target' 'target'};                          % 2 electrodes of interest
-percent = 20;                                       % % of timepoints included in the mean amplitude calculation
+POI = {'N45'};                                % peaks of interest
+EOI = {'Fz'};                                % electrodes of interest
+percent = 20;                                 % % of timepoints included in the mean amplitude calculation
 % ------------------------------------
 
 % make sure that the dataset contains all tested participants
@@ -574,9 +574,11 @@ for s = 1:length(subject_order)
             % setup names   
             figure_title = ['Subject n. ' num2str(subject_order(s)) ' : ' position{p} ' STS, ' current{c} ' current'];                                       
             if subject_order(s) < 10
-                file_name = ['AG-SICI_amplitude_S0' num2str(subject_order(s)) '_' position{p} '_' current{c}];
+%                 file_name = ['AG-SICI_amplitude_S0' num2str(subject_order(s)) '_' position{p} '_' current{c}];
+                file_name = ['AG-SICI_N45_S0' num2str(subject_order(s)) '_' position{p} '_' current{c}];
             else
-                file_name = ['AG-SICI_amplitude_S' num2str(subject_order(s)) '_' position{p} '_' current{c}];
+%                 file_name = ['AG-SICI_amplitude_S' num2str(subject_order(s)) '_' position{p} '_' current{c}];
+                file_name = ['AG-SICI_N45_S' num2str(subject_order(s)) '_' position{p} '_' current{c}];
             end
             
             % launch summary figure 
@@ -591,7 +593,7 @@ for s = 1:length(subject_order)
                 for k = 1:length(POI)                      
                     % choose TEP data 
                     peak_n = find(contains(AGSICI_TEP_avg.peak, POI{k}));
-                    electrode_n = find(contains(labels, EOI{peak_n}));
+                    electrode_n = find(contains(labels, EOI{k}));
                     data_visual = double(squeeze(AGSICI_data(p, c, i, s, electrode_n, :))); 
                     
                     % choose data for topoplot 
@@ -744,8 +746,8 @@ for s = 1:length(subject_order)
                     clear fig_1 choose_header choose_map_lims choose_span choose_x choose_x1 choose_x2 l
                     
                     % record outcome variables
-                    AGSICI_TEP_subject(s).latency_real(p, c, i, k) = central_latency;  
-                    AGSICI_TEP_subject(s).amplitude(p, c, i, k) = amplitude; 
+                    AGSICI_TEP_subject(s).latency_real(p, c, i, k+2) = central_latency;  
+                    AGSICI_TEP_subject(s).amplitude(p, c, i, k+2) = amplitude; 
                                         
                     % set up figure
                     r = (i - 1)*6;
@@ -813,8 +815,11 @@ clear p c i s k e a f g h r electrode_n peak_n figure_title file_name data_visua
     finish answer choose_fig choose_axesHandles choose_center choose_data choose_figure_name pos_x tune    
 
 % save data in a R-compatible table 
-AGSICI_outcome = table;
-row_counter = 1;
+if exist('AGSICI_outcome') == 0
+    AGSICI_outcome = table;
+end
+
+row_counter = height(AGSICI_outcome) + 1;
 for s = 1:length(subject_order) 
     for p = 1:length(position)  
         for c = 1:length(current)
