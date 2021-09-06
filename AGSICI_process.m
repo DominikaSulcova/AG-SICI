@@ -62,7 +62,7 @@ position = {'along' 'across'};
 current = {'normal' 'reversed'};
 intensity = {'stim_100' 'stim_120' 'stim_140'};
 prefix = 'avg avgchan bl icfilt ica visual crop but fft-notchfilt prefilt prea P1'; 
-filename = 'AG-SICI.mat';
+filename = 'AG-SICI_plus';
 
 % visualization 
 time_window = [-0.05, 0.3];
@@ -101,6 +101,9 @@ x = [time_window(1):xstep:time_window(2)];
 x_start = (time_window(1) - header.xstart)/xstep;
 x_end = (time_window(2) - header.xstart)/xstep;
 
+% create folder for figures
+mkdir(pwd, [filename '_figs']);
+
 clear c p 
 %% 1) load the data
 % load data based on the prefix + conditions
@@ -125,17 +128,17 @@ disp(['Datasize: ' num2str(size(A))])
 clear p c i s data 
 
 % save dataset to the global MATLAB file
-if exist(filename) == 0
+if exist([filename '.mat']) == 0
     AGSICI_data = A;
-    save(filename, 'AGSICI_data');
+    save([filename '.mat'], 'AGSICI_data');
 else
-    load(filename)
+    load([filename '.mat'])
     if exist('AGSICI_data') == 0
         AGSICI_data = A;
-        save(filename, 'AGSICI_data', '-append');
+        save([filename '.mat'], 'AGSICI_data', '-append');
     else
         AGSICI_data = cat(4, AGSICI_data, A);    
-        save(filename, 'AGSICI_data', '-append');
+        save([filename '.mat'], 'AGSICI_data', '-append');
     end
 end
 
@@ -215,8 +218,8 @@ for e = 1:length(electrode)
     
     % name and save figure
     figure_name = ['AGSICI_TEP_' electrode{e}];
-    savefig([figure_name])
-    saveas(fig, [figure_name '.png'])
+    savefig([pwd '\' filename '_figs\' figure_name '.fig'])
+    saveas(fig, [pwd '\' filename '_figs\' figure_name '.png'])
 
     % update figure counter
     figure_counter = figure_counter + 1 ;
@@ -259,8 +262,8 @@ for e = 1:length(electrode)
     
     % name and save figure
     figure_name = ['AGSICI_TEP_all_' electrode{e}];
-    savefig([figure_name])
-    saveas(fig, [figure_name '.png'])
+    savefig([pwd '\' filename '_figs\' figure_name '.fig'])
+    saveas(fig, [pwd '\' filename '_figs\' figure_name '.png'])
 
     % update figure counter
     figure_counter = figure_counter + 1 ;
@@ -268,7 +271,7 @@ end
 clear e p c fig data_visual P F lgd figure_name CI_visual
 
 % save dataset to the global MATLAB file
-save(filename, 'AGSICI_data_mean', 'AGSICI_data_CI', 'gmfp_data', 'gmfp_CI', '-append');
+save([filename '.mat'], 'AGSICI_data_mean', 'AGSICI_data_CI', 'gmfp_data', 'gmfp_CI', '-append');
 clear electrode AGSICI_data_CI 
 
 %% 3) GMFP
@@ -324,8 +327,8 @@ for p = 1:length(position)
         hold off
 
         % save figure, update    
-        savefig(fig_name)
-        saveas(fig, [fig_name '.png'])
+        savefig([pwd '\' filename '_figs\' figure_name '.fig'])
+        saveas(fig, [pwd '\' filename '_figs\' figure_name '.png'])
         figure_counter = figure_counter + 1;
         
         % update row counter
@@ -335,7 +338,7 @@ end
 clear p c t h_axis pos fig_name fig_title row_count fig data_topoplot
 
 % append new variables to the general MATLAB file
-save(filename, 'AGSICI_GMFP', 'AGSICI_TEP', '-append')
+save([filename '.mat'], 'AGSICI_GMFP', 'AGSICI_TEP', '-append')
 clear labeled max_peaks gmfp_data gmfp_CI
 
 %% 4) peak widths
@@ -388,8 +391,8 @@ for p = 1:length(position)
         hold off
         
         % save figure, update
-        savefig(['AG-SICI_widths_' position{p} '_' current{c}])
-        saveas(fig, ['AG-SICI_widths' position{p} '_' current{c} '.png'])
+        savefig([pwd '\' filename '_figs\AG-SICI_widths_' position{p} '_' current{c}])
+        saveas(fig, [pwd '\' filename '_figs\AG-SICI_widths' position{p} '_' current{c} '.png'])
         figure_counter = figure_counter + 1;
         
         % update row counter
@@ -398,166 +401,175 @@ for p = 1:length(position)
 end
 
 % append new variables to the general MATLAB file
-save(filename, 'AGSICI_TEP', '-append');
+save([filename '.mat'], 'AGSICI_TEP', '-append');
 clear x_limit x_start_narrow x_end_narrow x_narrow c p k data fig P L R row_count
 
 %% 5) peak tracking
-% % ----- decide output parameters -----
-% seed_electrode = {'target' 'Cz'};                                   % electrode that will be used to set 0 timepoint
-% seed_peaks = {1:2; 3:6};                                            % which peeks use which seed electrode
-% AGSICI_TEP_avg.peak = {'P25' 'N40' 'P50' 'P75' 'N100' 'P180'};      % choose peak names
-% AGSICI_TEP_avg.center = [0.024, 0.038, 0.047, 0.075, 0.118, 0.200]; % choose default peak centers
-% AGSICI_TEP_avg.width = [0.02, 0.02, 0.015, 0.04, 0.06, 0.07];        % choose default peak widths
-% buffer = 0.5;                                                       % a margin of the window for peak visualisation 
-% % ------------------------------------
-% 
-% % check if numbers match
-% if numel(seed_electrode) ~= numel(seed_peaks)
-%     disp('Number of seed electrodes does not correspond to the seed peak distribution!')
-% end
-% 
-% % select data to process
-% index = ismember(subject_order, subject);
-% AGSICI_data_subset = AGSICI_data(:, :, :, index, :, :);
-% for p = 1:length(position)
-%     for c = 1:length(current)     
-%         for s = 1:size(AGSICI_data_subset, 4)
-%             % average across intensities
-%             for e = 1:size(AGSICI_data, 5)
-%                 for t = 1:size(AGSICI_data, 6)
-%                     eoi_data(p, c, s, e, t) = mean(squeeze(AGSICI_data_subset(p, c, :, s, e, t)));
-%                 end
-%             end 
-%         end        
-%     end
-% end
-% clear index p c s e t 
-% 
-% % track selected peaks
-% % a = 1; k = 1; p = 1; c = 1;    
-% for k = 1:length(AGSICI_TEP_avg.peak)  
-%     % index seed electrode
-%     for a = 1:numel(seed_electrode)
-%         if any(seed_peaks{a} == k)
-%             seed = find(contains(labels, seed_electrode{a}));
-%         end
-%     end
-%     
-%     % check if this peek should be tracked
-%     answer = questdlg(['Do you want to track ' AGSICI_TEP_avg.peak{k} ' ?'], ...
-%         [seed_electrode{a} ' electrode , peak ' AGSICI_TEP_avg.peak{k}], 'YES', 'NO', 'NO'); 
-%     if strcmp(answer, 'NO')
-%         continue
-%     else
-%         % loop through the datasets
-%         for p = 1:length(position)
-%             for c = 1:length(current)
-%                 for s = 1:length(subject)              
-%                     % choose data 
-%                     for e = 1:size(eoi_data, 4)
-%                         data(1, e, 1, 1, 1, :) = squeeze(eoi_data(p, c, s, e, :));
-%                     end
-% 
-%                     % identify peak latency for current dataset
-%                     [peak_center, data_c, data_c_sub] = track_peak(data, header, time_window, ...
-%                         k, subject(s), AGSICI_TEP_avg, buffer, seed);
-% 
-%                     % fill in outcome structure
-%                     s_index = length(subject_order) - length(subject) + s;
-%                     AGSICI_TEP_subject(s_index).latency(p, c, k) = peak_center;
-% 
-%                     % append centered data
-%                     statement = ['AGSICI_' AGSICI_TEP_avg.peak{k} '_' position{p} '_' current{c} ...
-%                         '_centered(s, :, :) = data_c;'];
-%                     eval(statement)
-% 
-%                     % append centered subtracted data
-%                     statement = ['AGSICI_' AGSICI_TEP_avg.peak{k} '_' position{p} '_' current{c} ...
-%                         '_subtracted(s, :, :) = data_c_sub;'];
-%                     eval(statement)
-%                 end
-%             end
-%         end
-%     end
-% end
-% clear seed answer s_index a k p c e data statement peak_center data_c data_c_sub 
-% 
-% % average across subjects, save for letswave
-% for k = 1:length(AGSICI_TEP_avg.peak)    
-%     % fill in peak name 
-%     AGSICI_eoi(k).peak = AGSICI_TEP_avg.peak{k};
-%        
-%     % loop through datasets
-%     for p = 1:length(position)
-%         for c = 1:length(current)
-%             % skip round if the dataset doesn't exists
-%             data_name = ['AGSICI_' AGSICI_TEP_avg.peak{k} '_' position{p} '_' current{c} '_centered'];
-%             if ~exist(data_name)
-%                 disp(['Peak ' AGSICI_TEP_avg.peak{k} ' - ' position{p} ', ' current{c} ' : dataset not found.'])
-%                 continue
-%             end
-%             
-%             % fill in mean latency
-%             for s = 1:length(subject_order)
-%                 latency(s) = AGSICI_TEP_subject(s).latency(p, c, k);
-%             end
-%             AGSICI_eoi(k).latency(p, c) = mean(latency);
-%     
-%             % choose centered data
-%             statement = ['data_i = ' data_name ';'];
-%             eval(statement)
-% 
-%             % average across trials (subject x medication)
-%             for e = 1:size(data_i, 2)
-%                 for i = 1:size(data_i, 3)
-%                     data(1, e, 1, 1, 1, i) =  mean(squeeze(data_i(:, e, i)));         
-%                     AGSICI_eoi(k).data_centred(p, c, e, i) = mean(squeeze(data_i(:, e, i)));        
-%                 end
-%             end
-% 
-%             % save for LW
-%             fname = ['AGSICI TEP tracked_2 ' position{p} ' ' current{c} ' '  AGSICI_TEP_avg.peak{k} ' centered'];
-%             header.name = fname; 
-%             header.datasize(6) = size(data, 6);
-%             span = (1 + buffer) * AGSICI_TEP_avg.width(k);
-%             header.xstart = - span/2;
-%             save([fname '.mat'], 'data');
-%             save([fname '.lw6'], 'header');    
-%             clear data
-% 
-%             % choose centered subtracted data
-%             data_name = ['AGSICI_' AGSICI_TEP_avg.peak{k} '_' position{p} '_' current{c} '_subtracted;'];
-%             statement = ['data_i = ' data_name ';'];
-%             eval(statement)
-% 
-%             % average across trials (subject x medication)
-%             for e = 1:size(data_i, 2)
-%                 for i = 1:size(data_i, 3)
-%                     data(1, e, 1, 1, 1, i) =  mean(squeeze(data_i(:, e, i)));         
-%                     AGSICI_eoi(k).data_sub(p, c, e, i) = mean(squeeze(data_i(:, e, i)));        
-%                 end
-%             end
-% 
-%             % save for LW
-%             fname = ['AGSICI TEP tracked_2 ' position{p} ' ' current{c} ' '  AGSICI_TEP_avg.peak{k} ' subtracted'];
-%             header.name = fname; 
-%             save([fname '.mat'], 'data');
-%             save([fname '.lw6'], 'header');    
-%             clear data  
-%         end
-%     end
-% end
-% clear k p c s e i data_name  statement fname span
-% 
-% % append new variables to the general MATLAB file
-% save(filename, 'AGSICI_TEP_avg',  'AGSICI_TEP_subject', 'AGSICI_eoi', '-append');
-% clear seed_electrode seed_peaks buffer eoi_n eoi_data 
+% ----- decide output parameters -----
+seed_electrode = {'target' 'Cz'};                                   % electrode that will be used to set 0 timepoint
+seed_peaks = {1:2; 3:6};                                            % which peeks use which seed electrode
+AGSICI_TEP_avg.peak = {'P25' 'N40' 'P50' 'P75' 'N100' 'P180'};      % choose peak names
+AGSICI_TEP_avg.center = [0.024, 0.038, 0.047, 0.075, 0.118, 0.200]; % choose default peak centers
+AGSICI_TEP_avg.width = [0.02, 0.02, 0.015, 0.04, 0.06, 0.07];       % choose default peak widths
+buffer = 0.5;                                                       % a margin of the window for peak visualisation 
+% ------------------------------------
+
+check = questdlg('Do you want to track peaks ?', 'Peak tracking', 'YES', 'NO', 'NO'); 
+if strcmp(check, 'YES')
+    % check if numbers match
+    if numel(seed_electrode) ~= numel(seed_peaks)
+        disp('Number of seed electrodes does not correspond to the seed peak distribution!')
+    end
+
+    % select data to process
+    index = ismember(subject_order, subject);
+    AGSICI_data_subset = AGSICI_data(:, :, :, index, :, :);
+    for p = 1:length(position)
+        for c = 1:length(current)     
+            for s = 1:size(AGSICI_data_subset, 4)
+                % average across intensities
+                for e = 1:size(AGSICI_data, 5)
+                    for t = 1:size(AGSICI_data, 6)
+                        eoi_data(p, c, s, e, t) = mean(squeeze(AGSICI_data_subset(p, c, :, s, e, t)));
+                    end
+                end 
+            end        
+        end
+    end
+    clear index p c s e t 
+
+    % track selected peaks
+    % a = 1; k = 1; p = 1; c = 1;    
+    for k = 1:length(AGSICI_TEP_avg.peak)  
+        % index seed electrode
+        for a = 1:numel(seed_electrode)
+            if any(seed_peaks{a} == k)
+                seed = find(contains(labels, seed_electrode{a}));
+            end
+        end
+
+        % check if this peek should be tracked
+        answer = questdlg(['Do you want to track ' AGSICI_TEP_avg.peak{k} ' ?'], ...
+            [seed_electrode{a} ' electrode , peak ' AGSICI_TEP_avg.peak{k}], 'YES', 'NO', 'NO'); 
+        if strcmp(answer, 'NO')
+            continue
+        else
+            % loop through the datasets
+            for p = 1:length(position)
+                for c = 1:length(current)
+                    for s = 1:length(subject)              
+                        % choose data 
+                        for e = 1:size(eoi_data, 4)
+                            data(1, e, 1, 1, 1, :) = squeeze(eoi_data(p, c, s, e, :));
+                        end
+
+                        % identify peak latency for current dataset
+                        [peak_center, data_c, data_c_sub] = track_peak(data, header, time_window, ...
+                            k, subject(s), AGSICI_TEP_avg, buffer, seed);
+
+                        % fill in outcome structure
+                        s_index = length(subject_order) - length(subject) + s;
+                        AGSICI_TEP_subject(s_index).latency(p, c, k) = peak_center;
+
+                        % append centered data
+                        statement = ['AGSICI_' AGSICI_TEP_avg.peak{k} '_' position{p} '_' current{c} ...
+                            '_centered(s, :, :) = data_c;'];
+                        eval(statement)
+
+                        % append centered subtracted data
+                        statement = ['AGSICI_' AGSICI_TEP_avg.peak{k} '_' position{p} '_' current{c} ...
+                            '_subtracted(s, :, :) = data_c_sub;'];
+                        eval(statement)
+                    end
+                end
+            end
+        end
+    end
+    clear seed answer s_index a k p c e data statement peak_center data_c data_c_sub 
+
+    % average across subjects, save for letswave
+    for k = 1:length(AGSICI_TEP_avg.peak)    
+        % fill in peak name 
+        AGSICI_eoi(k).peak = AGSICI_TEP_avg.peak{k};
+
+        % loop through datasets
+        for p = 1:length(position)
+            for c = 1:length(current)
+                % skip round if the dataset doesn't exists
+                data_name = ['AGSICI_' AGSICI_TEP_avg.peak{k} '_' position{p} '_' current{c} '_centered'];
+                if ~exist(data_name)
+                    disp(['Peak ' AGSICI_TEP_avg.peak{k} ' - ' position{p} ', ' current{c} ' : dataset not found.'])
+                    continue
+                end
+
+                % fill in mean latency
+                for s = 1:length(subject_order)
+                    latency(s) = AGSICI_TEP_subject(s).latency(p, c, k);
+                end
+                AGSICI_eoi(k).latency(p, c) = mean(latency);
+
+                % choose centered data
+                statement = ['data_i = ' data_name ';'];
+                eval(statement)
+
+                % average across trials (subject x medication)
+                for e = 1:size(data_i, 2)
+                    for i = 1:size(data_i, 3)
+                        data(1, e, 1, 1, 1, i) =  mean(squeeze(data_i(:, e, i)));         
+                        AGSICI_eoi(k).data_centred(p, c, e, i) = mean(squeeze(data_i(:, e, i)));        
+                    end
+                end
+
+                % save for LW
+                fname = ['AGSICI TEP tracked_2 ' position{p} ' ' current{c} ' '  AGSICI_TEP_avg.peak{k} ' centered'];
+                header.name = fname; 
+                header.datasize(6) = size(data, 6);
+                span = (1 + buffer) * AGSICI_TEP_avg.width(k);
+                header.xstart = - span/2;
+                save([fname '.mat'], 'data');
+                save([fname '.lw6'], 'header');    
+                clear data
+
+                % choose centered subtracted data
+                data_name = ['AGSICI_' AGSICI_TEP_avg.peak{k} '_' position{p} '_' current{c} '_subtracted;'];
+                statement = ['data_i = ' data_name ';'];
+                eval(statement)
+
+                % average across trials (subject x medication)
+                for e = 1:size(data_i, 2)
+                    for i = 1:size(data_i, 3)
+                        data(1, e, 1, 1, 1, i) =  mean(squeeze(data_i(:, e, i)));         
+                        AGSICI_eoi(k).data_sub(p, c, e, i) = mean(squeeze(data_i(:, e, i)));        
+                    end
+                end
+
+                % save for LW
+                fname = ['AGSICI TEP tracked ' position{p} ' ' current{c} ' '  AGSICI_TEP_avg.peak{k} ' subtracted'];
+                header.name = fname; 
+                save([fname '.mat'], 'data');
+                save([fname '.lw6'], 'header');    
+                clear data  
+            end
+        end
+    end
+    clear k p c s e i data_name  statement fname span
+
+    % append new variables to the general MATLAB file
+    save([filename '.mat'], 'AGSICI_TEP_avg',  'AGSICI_TEP_subject', 'AGSICI_eoi', '-append');
+    clear seed_electrode seed_peaks buffer eoi_n eoi_data 
+else
+    if exist('AG-SICI.mat') > 0
+        load('AG-SICI.mat', 'AGSICI_TEP_subject')
+        AGSICI_TEP_subject = rmfield(AGSICI_TEP_subject, {'latency_real', 'amplitude'});
+        save([filename '.mat'], 'AGSICI_TEP_avg',  'AGSICI_TEP_subject', '-append');
+    end
+end
 
 %% 6) amplitude
 % ----- decide output parameters -----
-POI = {'N45'};                                % peaks of interest
-EOI = {'Fz'};                                % electrodes of interest
-percent = 20;                                 % % of timepoints included in the mean amplitude calculation
+POI = {'P25' 'N40'};                                % peaks of interest
+EOI = {'target' 'target'};                          % electrodes of interest
+percent = 20;                                       % % of timepoints included in the mean amplitude calculation
 % ------------------------------------
 
 % make sure that the dataset contains all tested participants
@@ -575,10 +587,10 @@ for s = 1:length(subject_order)
             figure_title = ['Subject n. ' num2str(subject_order(s)) ' : ' position{p} ' STS, ' current{c} ' current'];                                       
             if subject_order(s) < 10
 %                 file_name = ['AG-SICI_amplitude_S0' num2str(subject_order(s)) '_' position{p} '_' current{c}];
-                file_name = ['AG-SICI_N45_S0' num2str(subject_order(s)) '_' position{p} '_' current{c}];
+                file_name = ['AG-SICI_S0' num2str(subject_order(s)) '_' position{p} '_' current{c}];
             else
 %                 file_name = ['AG-SICI_amplitude_S' num2str(subject_order(s)) '_' position{p} '_' current{c}];
-                file_name = ['AG-SICI_N45_S' num2str(subject_order(s)) '_' position{p} '_' current{c}];
+                file_name = ['AG-SICI_S' num2str(subject_order(s)) '_' position{p} '_' current{c}];
             end
             
             % launch summary figure 
@@ -746,8 +758,8 @@ for s = 1:length(subject_order)
                     clear fig_1 choose_header choose_map_lims choose_span choose_x choose_x1 choose_x2 l
                     
                     % record outcome variables
-                    AGSICI_TEP_subject(s).latency_real(p, c, i, k+2) = central_latency;  
-                    AGSICI_TEP_subject(s).amplitude(p, c, i, k+2) = amplitude; 
+                    AGSICI_TEP_subject(s).latency_real(p, c, i, peak_n) = central_latency;  
+                    AGSICI_TEP_subject(s).amplitude(p, c, i, peak_n) = amplitude; 
                                         
                     % set up figure
                     r = (i - 1)*6;
@@ -798,8 +810,8 @@ for s = 1:length(subject_order)
             figure(fig)
             sgtitle(figure_title)  
             hold off
-            savefig(fig, [file_name '.fig'])
-            saveas(fig, [file_name '.png'])
+            savefig(fig, [pwd '\' filename '_figs\' file_name '.fig'])
+            saveas(fig, [pwd '\' filename '_figs\' file_name '.png'])
             close(fig)
 
             % update the figure counter
@@ -845,7 +857,7 @@ clear s p c i k row_counter
 writetable(AGSICI_outcome, 'AGSICI_outcome.csv')
 
 % append new variables to the general MATLAB file
-save(filename, 'AGSICI_TEP_subject', 'AGSICI_outcome', '-append');
+save([filename '.mat'], 'AGSICI_TEP_subject', 'AGSICI_outcome', '-append');
 clear POI EOI percent
 
 %% functions
