@@ -61,7 +61,7 @@ subject_order = [1, 3:18, 20, 21];
 position = {'along' 'across'}; 
 current = {'normal' 'reversed'};
 intensity = {'stim_100' 'stim_120' 'stim_140'};
-prefix = 'avg avgchan bl icfilt ica visual crop but fft-notchfilt prefilt prea P1'; 
+prefix = 'avg avgchan bl icfilt-plus ica visual crop but fft-notchfilt prefilt prea P1'; 
 filename = 'AG-SICI_plus';
 
 % visualization 
@@ -327,8 +327,8 @@ for p = 1:length(position)
         hold off
 
         % save figure, update    
-        savefig([pwd '\' filename '_figs\' figure_name '.fig'])
-        saveas(fig, [pwd '\' filename '_figs\' figure_name '.png'])
+        savefig([pwd '\' filename '_figs\' fig_name '.fig'])
+        saveas(fig, [pwd '\' filename '_figs\' fig_name '.png'])
         figure_counter = figure_counter + 1;
         
         % update row counter
@@ -566,9 +566,10 @@ else
 end
 
 %% 6) amplitude
+
 % ----- decide output parameters -----
-POI = {'P25' 'N40'};                                % peaks of interest
-EOI = {'target' 'target'};                          % electrodes of interest
+POI = {'P25' 'N47'};                                % peaks of interest
+EOI = {'target' 'FC1'};                          % electrodes of interest
 percent = 20;                                       % % of timepoints included in the mean amplitude calculation
 % ------------------------------------
 
