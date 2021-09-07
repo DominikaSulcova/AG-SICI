@@ -141,6 +141,7 @@ else
         save([filename '.mat'], 'AGSICI_data', '-append');
     end
 end
+clear A
 
 %% 2) preliminary TEP visualization 
 % ----- decide output parameters -----
@@ -257,7 +258,7 @@ for e = 1:length(electrode)
     xlim(time_window)
     ylim(y_limits)
     line([0, 0], y_limits, 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5)
-%     lgd = legend(P, {'along - normal' 'along - reversed' 'across - normal' 'across - reversed'}, 'Location', 'southwest');
+%     lgd = legend(P, {'along - normal' 'along - reversed' 'across - normal' 'across - reversed'}, 'Location', 'south', 'numcolumns', 2);
 %     lgd.FontSize = 14; title(lgd, 'Tested conditions')
     
     % name and save figure
@@ -339,7 +340,7 @@ clear p c t h_axis pos fig_name fig_title row_count fig data_topoplot
 
 % append new variables to the general MATLAB file
 save([filename '.mat'], 'AGSICI_GMFP', 'AGSICI_TEP', '-append')
-clear labeled max_peaks gmfp_data gmfp_CI
+clear labeled max_peaks gmfp_CI
 
 %% 4) peak widths
 % ----- decide output parameters -----
@@ -408,7 +409,7 @@ clear x_limit x_start_narrow x_end_narrow x_narrow c p k data fig P L R row_coun
 % ----- decide output parameters -----
 seed_electrode = {'target' 'Cz'};                                   % electrode that will be used to set 0 timepoint
 seed_peaks = {1:2; 3:6};                                            % which peeks use which seed electrode
-AGSICI_TEP_avg.peak = {'P25' 'N40' 'P50' 'P75' 'N100' 'P180'};      % choose peak names
+AGSICI_TEP_avg.peak = {'P25' 'N40' 'N45' 'P75' 'N100' 'P180'};      % choose peak names
 AGSICI_TEP_avg.center = [0.024, 0.038, 0.047, 0.075, 0.118, 0.200]; % choose default peak centers
 AGSICI_TEP_avg.width = [0.02, 0.02, 0.015, 0.04, 0.06, 0.07];       % choose default peak widths
 buffer = 0.5;                                                       % a margin of the window for peak visualisation 
@@ -566,10 +567,9 @@ else
 end
 
 %% 6) amplitude
-
 % ----- decide output parameters -----
-POI = {'P25' 'N47'};                                % peaks of interest
-EOI = {'target' 'FC1'};                          % electrodes of interest
+POI = {'P25' 'N45'};                                % peaks of interest
+EOI = {'target' 'FC1'};                             % electrodes of interest
 percent = 20;                                       % % of timepoints included in the mean amplitude calculation
 % ------------------------------------
 
