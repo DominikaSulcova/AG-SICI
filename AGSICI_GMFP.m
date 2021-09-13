@@ -34,9 +34,9 @@ intensity = {'stim_100' 'stim_120' 'stim_140'};
 load('E:\UCL\O365G-NOCIONS - People\dsulcova\AG-SICI\Data\P1\Processed data\avg avgchan bl icfilt ica visual crop but fft-notchfilt prefilt prea P1 03 along reversed stim_120.lw6', '-mat')
 
 % times of interest
-TOI = [0.015, 0.125];
-TOI_peaks = [0.023, 0.045, 0.075, 0.120];
-peaks = {'P25' 'N45' 'P75' 'N120'};
+TOI = [0.015, 0.05];
+TOI_peaks = [0.023, 0.045];
+peaks = {'P25' 'N45'};
 
 % visualization 
 figure_counter = 1;
@@ -215,7 +215,7 @@ end
 % add parameters
 set(gca, 'xtick', [1 2], 'xticklabel', {'along STS' 'across STS'})
 set(gca, 'Fontsize', 12)
-title('GMFP: area under the curve 15 - 120ms', 'FontWeight', 'bold', 'FontSize', 16)
+title(sprintf('GMFP: area under the curve %d - %dms', TOI(1)*1000, TOI(2)*1000), 'FontWeight', 'bold', 'FontSize', 16)
 xlabel('coil position'); ylabel('AUC');
 
 % mark outliers
