@@ -1,4 +1,4 @@
-%% AG-SICI: GMFP - 
+%% AG-SICI: GMFP - AREA UNDER THE CURVE
 % written by Dominika for AG-SICI project (2021)
 % 
 % 1) calculate GMFP for each subject/condition

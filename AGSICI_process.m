@@ -925,7 +925,7 @@ end
 set(gca, 'fontsize', 14)
 ylim(yl)
 xlabel('time (s)')
-ylabel('power (\muV^2)')
+ylabel('potential (\muV)')
 end
 function topo_plot(header, data, x_pos, x_start, map_lims)
 varargin = {'maplimits' map_lims 'shading' 'interp' 'whitebk' 'on'};
