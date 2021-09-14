@@ -34,12 +34,12 @@ intensity = {'stim_100' 'stim_120' 'stim_140'};
 load('E:\UCL\O365G-NOCIONS - People\dsulcova\AG-SICI\Data\P1\Processed data\avg avgchan bl icfilt ica visual crop but fft-notchfilt prefilt prea P1 03 along reversed stim_120.lw6', '-mat')
 
 % times of interest
-TOI = [0.015, 0.05];
-TOI_peaks = [0.023, 0.045];
-peaks = {'P25' 'N45'};
+TOI = [0.015, 0.085];
+TOI_peaks = [0.023 0.047 0.075];
+peaks = {'P25' 'N45' 'P75'};
 
 % visualization 
-figure_counter = 1;
+figure_counter = 8;
 colours = [0 0.48 0.74; 0.99 0.18 0.18; 0.96 0.68 0.68];
 lines = {':' '-'};
 time_window = [-0.05, 0.3]; 
@@ -88,10 +88,10 @@ data_visual = squeeze(mean(squeeze(GMFP_position(:, :, :)), 2));
 % launch the figure
 fig = figure(figure_counter);
 h_axis(1) = subplot(4, length(TOI_peaks) + 1 , 1 : 2*(length(TOI_peaks) + 1));
-title('GMFP: different coil position', 'FontSize', 16, 'FontWeight', 'bold')
+title(sprintf('GMFP: different coil position %d - %dms', TOI(1)*1000, TOI(2)*1000), 'FontSize', 16, 'FontWeight', 'bold')
 set(gca, 'fontsize', 12)
 xlabel('time (s)')
-ylabel('power (\muV^2)')
+ylabel('GMFP (\muV)')
 hold on
 
 % set limits of the figure
@@ -168,7 +168,11 @@ hold off
 fig.Position = [-1200 200 680 600];
 
 % save figure
-figure_name = 'AGSICI_GMFP_position';
+if length(peaks)>1
+    figure_name = sprintf('AGSICI_GMFP_%s-%s', peaks{1}, peaks{end});
+else
+    figure_name = sprintf('AGSICI_GMFP_%s', peaks{1});
+end
 savefig([folderpath '\' figure_name '.fig'])
 saveas(fig, [folderpath '\' figure_name '.png'])
 
@@ -233,7 +237,11 @@ end
 hold off
 
 % save figure
-figure_name = 'AGSICI_AUC_position';
+if length(peaks)>1
+    figure_name = sprintf('AGSICI_AUC_%s-%s', peaks{1}, peaks{end});
+else
+    figure_name = sprintf('AGSICI_AUC_%s', peaks{1});
+end
 savefig([folderpath '\' figure_name '.fig'])
 saveas(fig, [folderpath '\' figure_name '.png'])
 
