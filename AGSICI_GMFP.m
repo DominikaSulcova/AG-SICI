@@ -1,4 +1,4 @@
-%% AG-SICI: GMFP - AREA UNDER THE CURVE
+%% AG-SICI: GMFP - STRENGTH OF THE RESPONSE
 % written by Dominika for AG-SICI project (2021)
 % 
 % 1) calculate GMFP for each subject/condition
@@ -50,7 +50,6 @@ foldername = 'AG-SICI_plus_figs';
 folderpath = [pwd '\' foldername];
 if ~exist(folderpath) 
     mkdir(folderpath)
-    mkdir(folderpath, [filename '_figures'])
 end     
 
 %% 1) calculate GMFP 

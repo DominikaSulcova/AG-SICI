@@ -88,7 +88,8 @@ switch answer
             disp('No colour scheme found in this directory!')    
         end
 end
-save('colours.mat', 'colours'); clear a answer
+save('colours.mat', 'colours'); 
+clear a answer
 
 % load a random header
 load([prefix ' 01 across normal stim_100.lw6'], '-mat')
