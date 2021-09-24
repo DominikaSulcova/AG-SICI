@@ -1,4 +1,4 @@
-%% AG-SICI: GMFP - STRENGTH OF THE RESPONSE
+%% AG-SICI: STRENGTH OF THE RESPONSE
 % written by Dominika for AG-SICI project (2021)
 % 
 % 1) calculate GMFP for each subject/condition
@@ -52,7 +52,7 @@ if ~exist(folderpath)
     mkdir(folderpath)
 end     
 
-%% 1) calculate GMFP 
+%% 1) calculate GFP 
 % load the data
 load(data_path, data_var)
 
@@ -62,25 +62,107 @@ for p = 1:length(position)
         for s = 1:size(AGSICI_data, 4)    
             % average across intensities
             for t = 1:size(AGSICI_data, 6)
-                gmfp_data(p, c, s, :, t) = mean(squeeze(AGSICI_data(p, c, :, s, :, t)), 1);
+                gfp_data(p, c, s, :, t) = mean(squeeze(AGSICI_data(p, c, :, s, :, t)), 1);
             end
 
             % calculate GMFP
-            GMFP(p, c, s, :) = std(squeeze(gmfp_data(p, c, s, 1:size(gmfp_data, 4) - 1, :)), 1);
+            GFP(p, c, s, :) = std(squeeze(gfp_data(p, c, s, 1:size(gfp_data, 4) - 1, :)), 1);
         end
     end
 end
-clear p c i s t gmfp_data
+clear p c i s t 
+%% 2) group-level GFP
+% ----- adjustable parameters -----
+TOI = [0.015, 0.100];
+% ----- adjustable parameters -----
 
+% average data across subjects and intensities
+for p = 1:length(position)
+    for c = 1:length(current)
+        for i = 1:length(intensity)
+            % average across subjects
+            for e = 1:size(AGSICI_data, 5)
+                for t = 1:size(AGSICI_data, 6)
+                    data_mean(p, c, i, e, t) = mean(squeeze(AGSICI_data(p, c, i, :, e, t)));
+                end
+            end 
+        end        
+        % average across intensities
+        for e = 1:size(AGSICI_data, 5)
+            for t = 1:size(AGSICI_data, 6)
+                data_gmfp(p, c, e, t) = mean(squeeze(data_mean(p, c, :, e, t)));
+            end
+        end 
+    end
+end
+clear p c i e t 
+
+%calculate GMFP and plot separate figures
+for p = 1:length(position)
+    for c = 1:length(current)
+        % calculate GMFP (exclude target channel)
+        GFP(p, c, :) = std(squeeze(data_gmfp(p, c, 1:size(data_gmfp, 3) - 1, :)), 1); 
+        
+        % launch the figure
+        fig = figure(figure_counter);
+        title(sprintf('%s STS - %s current', position{p}, current{c}), 'FontSize', 16, 'FontWeight', 'bold')
+        set(gca, 'fontsize', 12)
+        xlabel('time (s)')
+        ylabel('GFP (\muV)')
+        hold on
+
+        % set limits of the figure
+        plot(x, squeeze(GFP(p, c, :)))
+        yl = get(gca, 'ylim'); yl(1) = yl(1) - 0.2; yl(2) = yl(2) + 0.3;
+        xl = get(gca, 'xlim');
+        cla
+        ylim(yl); xlim(xl);
+        
+        % define colour
+        col = colours_cond((p-1)*2 + c, :);
+        
+        % mark the area of interest
+        x_start = (TOI(1) - time_window(1))/header.xstep;
+        x_end = (TOI(2) - time_window(1))/header.xstep;
+        x_fill = [TOI(1) : header.xstep: TOI(2)];
+        fill([x_fill fliplr(x_fill)],[squeeze(GFP(p, c, x_start:x_end))' zeros(1, length(squeeze(GFP(p, c, x_start:x_end))))], ...
+            col , 'facealpha', 0.3, 'linestyle', 'none');
+        
+        % plot interpolated part
+        rectangle('Position', [0, yl(1)+0.01, 0.01, yl(2) - yl(1)], ...
+            'FaceColor', [0.75 0.75 0.75], 'EdgeColor', 'none') 
+        
+        % plot signal 
+        P = plot(x, squeeze(GFP(p, c, :)), 'Color', col, 'LineWidth', 2.5);
+        
+        % plot lines
+        line(xl, [0 0], 'Color', [0.75, 0.75, 0.75], 'LineWidth', 0.5)
+        line([0, 0], yl, 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5) 
+        hold off
+        
+        % update position
+        pos = get(gcf, 'Position');
+        fig.Position = [pos(1) pos(2)-200 600 300];
+        
+        % save figure
+        figure_name = sprintf('AGSICI_GFP_%s_%s', position{p}, current{c});
+        savefig([folder_fig '\' figure_name '.fig'])
+        saveas(fig, [folder_fig '\' figure_name '.png'])
+        
+        % update counter
+        figure_counter = figure_counter + 1;
+    end
+end
+clear p c fig zl xl x_start x_end x_fill col P figure_name pos
+%% 2) plot - contrast coil position
 % merge 'current' conditions 
 for p = 1:length(position)
     for s = 1:size(AGSICI_data, 4)   
-        GMFP_position(p, s, :) = mean(squeeze(GMFP(p, :, s, :)), 1);
+        GMFP_position(p, s, :) = mean(squeeze(GFP(p, :, s, :)), 1);
     end
 end
 clear p s 
 
-%% 2) plot - contrast coil position
 % average data across subjects                
 data_visual = squeeze(mean(squeeze(GMFP_position(:, :, :)), 2));
 

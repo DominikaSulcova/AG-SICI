@@ -106,49 +106,6 @@ end
 fclose(fileID)
 clear filename fileID a folder_name
 
-%% 3) DISS - between levels of ORIENTATION
-% ----- adjustable parameters -----
-comp = {[1 1; 1 2] [2 1; 2 2] [1 1; 2 1] [1 2; 2 2]};
-% ----- adjustable parameters -----
-
-% calculate DISS and spatial correlation C  
-AGSICI_DISS = struct;
-for c = 1:length(comp)
-    AGSICI_DISS(c).comparison = [position{comp{c}(1, 1)} '-' current{comp{c}(1, 2)} ' X ' position{comp{c}(2, 1)} '-' current{comp{c}(2, 2)}];
-    for s = 1:length(subject)
-        for i = 1:size(AGSICI_data_norm, 5)
-            % calculate difference in normalized data
-            diff = squeeze(AGSICI_data_norm(comp{c}(1, 1), comp{c}(1, 2), s, :, i) - AGSICI_data_norm(comp{c}(2, 1), comp{c}(2, 2), s, :, i));
-            
-            % calculate outcome values
-            AGSICI_DISS(c).data.DISS(s, i) = sqrt(mean(diff.^2));
-            AGSICI_DISS(c).data.corr(s, i) = 1 - (AGSICI_DISS(c).data.DISS(s, i)^2)/2;
-        end
-    end
-end
-clear c s i diff
-
-% plot the figures
-for c = 1:length(comp)
-    % choose data 
-    data_visual(1, :) = mean(AGSICI_DISS(c).data.DISS, 1);
-    data_visual(2, :) = mean(AGSICI_DISS(c).data.corr, 1);
-
-    % plot DISS and correlation
-    fig = figure(figure_counter);
-    plot_DISS(x, data_visual, 'legend', {'DISS' 'spatial correlation'})
-    title(['DISS: ' AGSICI_DISS(c).comparison], 'FontSize', 16, 'FontWeight', 'bold')
-
-    % save the figure
-    figure_name = ['AGSICI_DISS_' AGSICI_DISS(c).comparison];
-    saveas(fig, [folder_fig '\' figure_name '.png'])
-    figure_counter = figure_counter + 1;
-end
-clear c data_visual fig figure_name
-
-% append new variables to the general MATLAB file
-save(data_path, 'AGSICI_DISS', '-append');
-
 %% 2) data normalization - all levels of ORIENTATION
 % average across intensities
 for p = 1:length(position)
@@ -188,7 +145,7 @@ clear p c s i
 % append new variables to the general MATLAB file
 save(data_path, 'AGSICI_GFP_subject', 'AGSICI_data_norm', '-append');
 
-%% 4) plot ICA - average timecourse
+%% 3) plot ICA - average timecourse
 % ----- adjustable parameters -----
 folder_ica = 'E:\UCL\O365G-NOCIONS - People\dsulcova\AG-SICI\ICA2';
 % ----- average across all categories -----
@@ -259,7 +216,50 @@ for a = 1:size(data_visual, 2)
 end
 clear a fig figure_name data_visual
 
-%% 5) 
+%% DISS - between levels of ORIENTATION
+% ----- adjustable parameters -----
+comp = {[1 1; 1 2] [2 1; 2 2] [1 1; 2 1] [1 2; 2 2]};
+% ----- adjustable parameters -----
+
+% calculate DISS and spatial correlation C  
+AGSICI_DISS = struct;
+for c = 1:length(comp)
+    AGSICI_DISS(c).comparison = [position{comp{c}(1, 1)} '-' current{comp{c}(1, 2)} ' X ' position{comp{c}(2, 1)} '-' current{comp{c}(2, 2)}];
+    for s = 1:length(subject)
+        for i = 1:size(AGSICI_data_norm, 5)
+            % calculate difference in normalized data
+            diff = squeeze(AGSICI_data_norm(comp{c}(1, 1), comp{c}(1, 2), s, :, i) - AGSICI_data_norm(comp{c}(2, 1), comp{c}(2, 2), s, :, i));
+            
+            % calculate outcome values
+            AGSICI_DISS(c).data.DISS(s, i) = sqrt(mean(diff.^2));
+            AGSICI_DISS(c).data.corr(s, i) = 1 - (AGSICI_DISS(c).data.DISS(s, i)^2)/2;
+        end
+    end
+end
+clear c s i diff
+
+% plot the figures
+for c = 1:length(comp)
+    % choose data 
+    data_visual(1, :) = mean(AGSICI_DISS(c).data.DISS, 1);
+    data_visual(2, :) = mean(AGSICI_DISS(c).data.corr, 1);
+
+    % plot DISS and correlation
+    fig = figure(figure_counter);
+    plot_DISS(x, data_visual, 'legend', {'DISS' 'spatial correlation'})
+    title('Global dissimilarity - coil position', ...
+        'FontSize', 16, 'FontWeight', 'bold')
+
+    % save the figure
+    figure_name = 'AGSICI_DISS_position';
+    savefig([folder_fig '\' figure_name '.fig'])
+    saveas(fig, [folder_fig '\' figure_name '.png'])
+    figure_counter = figure_counter + 1;
+end
+clear c data_visual fig figure_name
+
+% append new variables to the general MATLAB file
+save(data_path, 'AGSICI_DISS', '-append');
 
 %% functions
 function plot_TEP(x, data_visual, varargin)
@@ -401,15 +401,14 @@ line([x(1) x(end)], [0 0], 'Color', [0, 0, 0], 'LineWidth', 0.5)
 line([x(1) x(end)], [1 1], 'Color', [0.85 0.85 0.85], 'LineWidth', 0.5)
 line([0, 0], [-0.75 1.75], 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 4) 
 
-% plot legend if required
-if length(legend_on) > 0
-    lgd = legend(P([2 1]), legend_on, 'Location', 'southeast');
-    lgd.FontSize = 14;
-end
-
 % set up the parameters
 set(gca, 'fontsize', 14); xlabel('time (s)')
 ax = gca; ax.XColor = [0.5 0.5 0.5];
-ylim([-0.75 1.75]) 
-xlim([x(1) x(end)])
+ylim([-0.75 1.75]); 
+
+% plot legend if required
+if length(legend_on) > 0
+    lgd = legend(P([2 1]), legend_on, 'Location', 'southeast');
+    lgd.FontSize = 10;
+end
 end
