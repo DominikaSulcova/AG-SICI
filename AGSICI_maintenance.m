@@ -22,4 +22,4 @@ for p = 1:length(position)
         end
     end
 end
-clear p c s data subj filename     
+clear p c s data subj filename   

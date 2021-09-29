@@ -299,34 +299,44 @@ else
     col = [0.24 0.49 0.99; 0.72 0.27 1; 0.87 0.16 0.40; 0.99 0.18 0.18];
 end
 
-
-
-% identify dataset with largest + and - amplitudes
-for b = 1:size(data_visual, 1)
-    data_max(b) = max(data_visual(b, :));
-    data_min(b) = min(data_visual(b, :));
+% check for limits
+if ~isempty(varargin)
+    a = find(strcmpi(varargin, 'limit'));
+    if ~isempty(a)
+        lim = varargin{a + 1};
+    end
 end
-data_lim = [find(data_max == max(data_max)) find(data_min == min(data_min))];
 
 % set figure limits
 hold on
-plot(x, data_visual(data_lim(1), :), x, data_visual(data_lim(2), :))
-yl = get(gca, 'ylim');
-ylim([yl(1), yl(2) + 0.15*(yl(2) - yl(1))])
+if ~exist('lim')
+    % identify dataset with largest + and - amplitudes
+    for b = 1:size(data_visual, 1)
+        data_max(b) = max(data_visual(b, :));
+        data_min(b) = min(data_visual(b, :));
+    end
+    data_lim = [find(data_max == max(data_max)) find(data_min == min(data_min))];
+
+    % find limits
+    plot(x, data_visual(data_lim(1), :), x, data_visual(data_lim(2), :))
+    yl = get(gca, 'ylim');
+    lim = [yl(1), yl(2) + 0.15*(yl(2) - yl(1))];
+end
+ylim(lim)
 xlim([x(1) x(end)])
 
 % plot background objects
-rectangle('Position', [0, yl(1), 0.01, (yl(2) + 0.15*(yl(2) - yl(1))) - yl(1)], ...
+rectangle('Position', [0, lim(1), 0.01, lim(2) - lim(1)], ...
     'FaceColor', [0.75, 0.75, 0.75], 'EdgeColor', 'none')
 line([x(1) x(end)], [0 0], 'Color', [0.75, 0.75, 0.75], 'LineWidth', 1)
 
 % plot data
 for c = 1:size(data_visual, 1)
-    P(c) = plot(x, data_visual(c, :), 'Color', col(c, :), 'LineWidth', 3);
+    P(c) = plot(x, data_visual(c, :), 'Color', col(c, :), 'LineWidth', 2);
 end
 
 % mark the TMS stimulus
-line([0 0], [yl(1), yl(2) + 0.15*(yl(2) - yl(1))], 'Color', [0 0 0], 'LineWidth', 4, 'LineStyle', '--')
+line([0 0], lim, 'Color', [0 0 0], 'LineWidth', 2.5, 'LineStyle', '--')
 
 % plot legend if required
 if length(legend_on) > 0
@@ -349,15 +359,15 @@ if latency
 
     % mark the peak
     plot(peak_x, peak_y, 'o', 'MarkerFaceColor', [0.888 0.196 0.028], 'MarkerSize', 12, 'MarkerEdgeColor', 'none')
-    line([peak_x peak_x], [yl(1), peak_y], 'Color', [0.888 0.196 0.028], 'LineWidth', 2, 'LineStyle', ':')
+    line([peak_x peak_x], [lim(1), peak_y], 'Color', [0.888 0.196 0.028], 'LineWidth', 2, 'LineStyle', ':')
 
     % add annotation
-    text(0.025, yl(2) + 0.10*(yl(2) - yl(1)), sprintf('peak latency: %3.0f ms', ...
-        round(peak_x *1000)), 'Color', [0.888 0.196 0.028], 'FontSize',14)
+    text(0.025, lim(2) + 0.10*(lim(2) - lim(1)), sprintf('peak latency: %3.0f ms', ...
+        round(peak_x *1000)), 'Color', [0.888 0.196 0.028], 'FontSize', 14)
 end
 
 % set other parameters
-set(gca, 'fontsize', 14)
+set(gca, 'fontsize', 12)
 xlabel('time (s)')
 ylabel('amplitude (\muV)')
 
