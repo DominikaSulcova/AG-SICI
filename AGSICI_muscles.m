@@ -42,7 +42,7 @@ save('colours.mat', 'colours');
 clear a c p answer
 
 % load a random header
-load([prefix ' 01 across normal stim_100.lw6'], '-mat')
+load('avg avgchan bl icfilt ica visual crop but fft-notchfilt prefilt prea P1 06 across reversed stim_140.lw6', '-mat')
 
 % visualization 
 figure_counter = 1;
@@ -385,7 +385,7 @@ saveas(fig, [output_folder '\AGSICI_muscles_corr_all_ranked.png'])
 % update the counter
 figure_counter = figure_counter + 1;  
 
-clear data_corr data_corr_ranked fig data_model data_model_ranked marker_col
+clear data_corr data_corr_ranked fig data_model data_model_ranked marker_col temp
 
 %% 7) correlation per stimulation orientation
 for p = 1:length(position)
@@ -451,6 +451,77 @@ for p = 1:length(position)
         figure_counter = figure_counter + 1;  
     end
 end
+clear p c data_corr data_corr_ranked fig data_model data_model_ranked marker_col temp
+
+%% 8) correlation per stimulation intensity
+% choose colours
+marker_col = [];
+for a = 1:4
+    for b = 1:length(subject)
+        marker_col = [marker_col; colours(a, :)];
+    end
+end
+clear a b
+
+% plot
+for i = 1:length(intensity)         
+    % extract data
+    data_corr_muscle = [];
+    data_corr_N45 = []; 
+    for p = 1:length(position)
+        for c = 1:length(current)   
+            data_corr_muscle = [data_corr_muscle; squeeze(AGSICI_muscle_activity.muscles.GFP_TOI(p, c, i, :))];
+            data_corr_N45 = [data_corr_N45; squeeze(AGSICI_muscle_activity.N45.GFP_TOI(p, c, i, :))];
+        end
+    end
+    data_corr = [data_corr_muscle data_corr_N45];
+    clear p c data_corr_muscle data_corr_N45
+    
+    % ----- linear correlation -----
+    % prepare linear model: y ~ 1 + x
+    data_model = fitlm(data_corr(:, 1), data_corr(:, 2), 'VarNames', {'muscular activity' 'N45'});
+
+    % plot data + regression line
+    fig = figure(figure_counter);
+    hold on
+    plot_corr(data_model, data_corr, marker_col, 'Pearson')
+    title(sprintf('Linear correlation: %s %%rMT', intensity{i}(end-2:end)), 'FontWeight', 'bold', 'FontSize', 16)
+
+    % save the figure       
+    savefig([output_folder '\AGSICI_muscles_corr_int_' intensity{i}(end-2:end) '.fig'])
+    saveas(fig, [output_folder '\AGSICI_muscles_corr_int_' intensity{i}(end-2:end) '.png'])
+
+    % update the counter
+    figure_counter = figure_counter + 1;  
+
+    % ----- non-linear correlation -----
+    % clculate correlation coeficient and p
+    [cor_coef, cor_p] = corr(data_corr, 'Type', 'Spearman');
+
+    % rank the data
+    for a = 1:size(data_corr, 2)
+        [temp, data_corr_ranked(:, a)]  = ismember(data_corr(:, a), unique(data_corr(:, a)));
+    end
+    clear a
+
+    % prepare linear model: y ~ 1 + x
+    data_model_ranked = fitlm(data_corr_ranked(:, 1), data_corr_ranked(:, 2), 'VarNames', {'muscular activity' 'N45'});
+
+    % plot data + regression line
+    fig = figure(figure_counter);
+    hold on
+    plot_corr(data_model_ranked, data_corr_ranked, marker_col, 'Spearman')
+    title(sprintf('Non-linear correlation, ranked: %s %%rMT', intensity{i}(end-2:end)), 'FontWeight', 'bold', 'FontSize', 16)
+
+    % save the figure       
+    savefig([output_folder '\AGSICI_muscles_corr_int_' intensity{i}(end-2:end) '_ranked.fig'])
+    saveas(fig, [output_folder '\AGSICI_muscles_corr_int_' intensity{i}(end-2:end) '_ranked.png'])
+
+    % update the counter
+    figure_counter = figure_counter + 1;  
+end
+
+clear data_corr data_corr_ranked fig data_model data_model_ranked marker_col temp
 
 %% functions
 function plot_TEP(x, data_visual, varargin)

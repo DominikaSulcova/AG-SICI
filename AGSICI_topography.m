@@ -259,7 +259,128 @@ for a = 1:size(data_visual, 2)
 end
 clear a fig figure_name data_visual
 
-%% 5) 
+%% 5) hilbert
+% ----- adjustable parameters -----
+prefix = 'avg hilbert highpass_35Hz bl icfilt-plus ica visual crop but fft-notchfilt prefilt prea P1';
+% ----- average across all categories -----
+
+% extract the data
+AGSICI_hilbert = struct;
+for p = 1:length(position)
+    for c = 1:length(current)
+        for i = 1:length(intensity)
+            for s = 1:length(subject)
+                % define subject
+                if subject(s) < 10
+                    subj = ['0' num2str(subject(s))];
+                else
+                    subj = [num2str(subject(s))];
+                end
+                
+                % load the data
+                name = [prefix ' ' subj ' ' position{p} ' ' current{c} ' ' intensity{i} '.mat'];
+                load(name)
+                
+                % append to the outcome structure
+                AGSICI_hilbert.data(p, c, i, s, :, :) = squeeze(data(:, 1:32, :, :, :, :));
+            end
+        end
+    end
+end
+clear p c i s subj name data
+
+% calculate RMS
+for p = 1:length(position)
+    for c = 1:length(current)
+        for i = 1:length(intensity)
+            for s = 1:length(subject)
+                % for each electrode separately
+                for e = 1:size(AGSICI_hilbert.data, 5)
+                    AGSICI_hilbert.RMS(p, c, i, s, e) =  sqrt(mean(squeeze(AGSICI_hilbert.data(p, c, i, s, e, :)).^2));
+                end
+                
+                % average across electrodes
+                AGSICI_hilbert.RMS_avg(p, c, i, s) = mean(AGSICI_hilbert.RMS(p, c, i, s, :));
+            end
+        end
+    end
+end
+clear p c i s e   
+
+% calculate mean values to plot
+for i = 1:length(intensity)
+    for p = 1:length(position)
+        for c = 1:length(current)
+            data_visual(i, (p-1)*2 + c) = mean(AGSICI_hilbert.RMS_avg(p, c, i, :));
+            data_sem(i, (p-1)*2 + c) = std(AGSICI_hilbert.RMS_avg(p, c, i, :))/sqrt(length(subject));
+        end
+    end
+end
+clear p c i 
+
+% plot average RMS by condition
+fig = figure(figure_counter)
+hold on
+barplot = bar(data_visual, 'EdgeColor', 'none');
+for a = 1:size(data_visual, 1)
+    barplot(a).FaceColor = colours(a, :)
+end
+legend(barplot, {'along - normal', 'along - reversed', 'across - normal', 'across - reversed'}, ...
+    'Location', 'bestoutside', 'fontsize', 14)
+xlabel('intensity of stimulation (%rMT)')
+set(gca, 'xtick', 1:length(intensity), 'xticklabel', {'100' '120' '140'})
+set(gca, 'Fontsize', 14)
+ylim([0, 1.6])
+hold off
+
+%% hilbert - correlation with N45 amplitude
+% prepare data
+load(data_path, 'AGSICI_outcome')
+data_cor = [];
+for i = 1:length(intensity)
+    for p = 1:length(position)
+        for c = 1:length(current)
+            data_cor(end+1 : end+length(subject), 1) = AGSICI_hilbert.RMS_avg(p, c, i, :);
+        end
+    end
+end
+for a = 1:height(AGSICI_outcome)
+    if strcmp(AGSICI_outcome.peak{a}, 'N45') 
+        data_temp(a) = AGSICI_outcome.amplitude(a);
+    end
+end
+
+% prepare the model
+data_model = fitlm(mat_cor(:, row(a)), mat_cor(:, col(a)), 'VarNames', [varnames(row(a)) varnames(col(a))]);
+
+% choose only correlations that show TEP-MEP interactions
+if col(a) == 6
+% plot data + regression line
+fig = figure(figure_counter);
+hold on
+plot_cor = plotAdded(data_model);
+
+% adjust parameters    
+title([medication{m} ' : ' varnames{col(a)} ' ~ ' varnames{row(a)}])
+xlabel(['change in ' varnames{row(a)}]); ylabel(['change in ' varnames{col(a)}]);
+set(gca, 'FontSize', 14)
+plot_cor(1).Marker = 'o'; plot_cor(1).MarkerSize = 8; 
+plot_cor(1).MarkerEdgeColor = colours2(2, :); plot_cor(1).MarkerFaceColor = colours2(2, :);
+plot_cor(2).Color = colours2(3, :); plot_cor(2).LineWidth = 2; 
+plot_cor(3).Color = colours2(3, :); plot_cor(3).LineWidth = 2;
+legend off
+if data_model.Coefficients.Estimate(2) > 0
+    text_pos = [0.95 0.85 0.75];
+else
+    text_pos = [0.25 0.15 0.05];
+end
+T(1) = text(0.05, text_pos(1), sprintf( 'y = %1.3f * x', data_model.Coefficients.Estimate(2)), 'Units', 'Normalized');
+T(2) = text(0.05, text_pos(2), sprintf('R^2 = %1.3f', data_model.Rsquared.Ordinary), 'Units', 'Normalized');
+T(3) = text(0.05, text_pos(3), sprintf('r = %1.3f, p = %1.3f', cor_coef(row(a), col(a)), cor_p(row(a), col(a))), 'Units', 'Normalized');
+set(T(1), 'fontsize', 14, 'fontweight', 'bold', 'fontangle', 'italic');   
+set(T(2), 'fontsize', 14); 
+set(T(3), 'fontsize', 14, 'color', colours2(3, :)); 
+hold off
 
 %% functions
 function plot_TEP(x, data_visual, varargin)

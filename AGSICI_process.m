@@ -949,7 +949,6 @@ end;
 topoplot(vector2,chanlocs2,varargin{:});
 set(gcf,'color',[1 1 1]);
 end
-
 function [pos_x, data, sub_data] = track_peak(data, header, time_window, k, s, TEP, buffer, seed)
 % figure params 
 figure_name = ['Subject n. ' num2str(s) ' - peak ' TEP.peak{k}] ;
@@ -1118,7 +1117,6 @@ pos_x = CP(1,1);
 
 end
 end
-
 function [amplitude, averaged_x, averaged_data] = TEP_amplitude(data, polarity, center, span, percent, step, xstart)
 % ------------------------------------------------------------------------
 % Fnc: Calculates mean amplitude of the most prominent <percent> of the TOI 
