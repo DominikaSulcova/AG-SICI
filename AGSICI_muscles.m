@@ -59,8 +59,7 @@ if ~exist(output_folder)
 end    
 
 % identify matlab file with results
-results_path = uigetdir(pwd, 'Choose the directory with the global output file');
-results_folder = [results_path '\AG-SICI_plus.mat'];
+results_folder = [uigetdir(pwd, 'Choose the directory with the global output file') '\AG-SICI_plus.mat'];
 
 %% 1) prepare the data
 % ----- adjustable parameters -----
@@ -523,7 +522,7 @@ end
 
 clear data_corr data_corr_ranked fig data_model data_model_ranked marker_col temp
 
-%% 9) tonic muscular activity
+%% 9) tonic muscular activity - extract/export data
 % ----- adjustable parameters -----
 prefix_m_tonic = 'dc muscle ica visual crop but fft-notchfilt prefilt prea P1'; 
 x_end_tonic = (-0.005 - header.xstart)/xstep;
@@ -561,8 +560,103 @@ for p = 1:length(position)
 end
 clear p c i s subj data t e rms
 
+% export as a long-format table
+AGSICI_tonic = table;
+AGSICI_tonic.subject = zeros(0); AGSICI_tonic.orientation = {}; AGSICI_tonic.intensity = zeros(0); 
+AGSICI_tonic.baseline_RMS = zeros(0);  
+row_cnt = 1;
+for s = 1:length(subject)
+    for p = 1:length(position)
+        for c = 1:length(current)
+            for i = 1:length(intensity)
+                % fill in the row
+                AGSICI_tonic.subject(row_cnt) = subject(s);             
+                AGSICI_tonic.orientation(row_cnt) = {[position{p} '-' current{c}]};
+                AGSICI_tonic.intensity(row_cnt) = str2double(intensity{i}(end-2:end));
+                AGSICI_tonic.baseline_RMS(row_cnt) = AGSICI_muscle_activity.tonic(p, c, i, s);
+                
+                % update row counter
+                row_cnt = row_cnt + 1;
+            end
+        end
+    end
+end
+writetable(AGSICI_tonic, [output_folder '\AGSICI_tonic.csv'])
+clear p c s i row_cnt
+
 % append new variables to the general MATLAB file
-save(results_folder, 'AGSICI_muscle_activity', '-append');
+save(results_folder, 'AGSICI_muscle_activity', 'AGSICI_tonic', '-append');
+
+%% 10) tonic muscular activity - plot
+% calculate mean values to plot
+for i = 1:length(intensity)
+    for p = 1:length(position)
+        for c = 1:length(current)
+            data_visual(i, (p-1)*2 + c) = mean(AGSICI_muscle_activity.tonic(p, c, i, :));
+        end
+    end
+end
+clear p c i 
+
+% plot average RMS by condition
+fig = figure(figure_counter)
+hold on
+barplot = bar(data_visual, 'EdgeColor', 'none');
+for a = 1:size(data_visual, 2)
+    barplot(a).FaceColor = colours(a, :);
+end
+legend(barplot, {'along - normal', 'along - reversed', 'across - normal', 'across - reversed'}, ...
+    'Location', 'bestoutside', 'fontsize', 14)
+xlabel('intensity of stimulation (%rMT)')
+ylabel('baseline RMS')
+set(gca, 'xtick', 1:length(intensity), 'xticklabel', {'100' '120' '140'})
+set(gca, 'Fontsize', 14)
+hold off
+
+% save the figure
+savefig([output_folder '\AGSICI_tonic_bl_all.fig'])
+saveas(fig, [output_folder '\AGSICI_tonic_bl_all.png'])
+
+% update figure counter
+figure_counter = figure_counter + 1;
+clear fig barplot a data_visual 
+
+% average across intensities
+for p = 1:length(position)
+    for c = 1:length(current)
+        data_visual(:, (p-1)*2 + c) = squeeze(mean(AGSICI_muscle_activity.tonic(p, c, :, :), 3));
+    end
+end
+clear p c
+
+% plot average RMS - boxplot
+fig = figure(figure_counter); ax = gca;       
+hold on
+boxplot(data_visual, 'color', colours)
+ax.XTickLabel = '';
+label_array = {'along' 'along' 'across' 'across'; 'normal' 'reversed' 'normal' 'reversed'}; 
+for i = 1:length(label_array)
+    text(i, ax.YLim(1), sprintf('%s\n%s', label_array{:, i}), 'FontSize', 14, ...
+        'horizontalalignment', 'center', 'verticalalignment', 'top');    
+end
+ylabel('baseline RMS')
+set(gca, 'Fontsize', 14)
+clear i label_array 
+
+% plot the markers
+for b = 1:4
+    scat(b) = scatter(repelem(b, size(data_visual, 1)), data_visual(:, b),...
+        75, colours(b, :), 'filled');
+end
+
+% save the figure
+savefig([output_folder '\AGSICI_tonic_bl.fig'])
+saveas(fig, [output_folder '\AGSICI_tonic_bl.png'])
+
+% update figure counter
+figure_counter = figure_counter + 1;
+clear fig ax scat b data_visual 
+
 %% functions
 function plot_TEP(x, data_visual, varargin)
 % check whether to plot labels 
