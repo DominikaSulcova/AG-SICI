@@ -64,12 +64,12 @@ results_folder = [results_path '\AG-SICI_plus.mat'];
 
 %% 1) prepare the data
 % ----- adjustable parameters -----
-prefix_m = 'avg bl hilbert muscle ica visual crop but fft-notchfilt prefilt prea P1'; 
+prefix_m = 'icfilt ica art-sup raw P1'; 
 prefix_IC = 'icfilt_N45 ica2 avg avgchan bl icfilt-plus ica visual crop but fft-notchfilt prefilt prea P1'; 
 % ----- adjustable parameters -----
 
 % load from lw
-AGSICI_muscle_activity = struct;
+% AGSICI_muscle_activity = struct;
 for p = 1:length(position)
     for c = 1:length(current)
         for i = 1:length(intensity)
@@ -81,15 +81,15 @@ for p = 1:length(position)
                     subj = num2str(subject(s));
                 end
                 
-                % load and crop - muscular contraction data
+                % load and crop - muscular contraction 
                 name = [prefix_m ' ' subj ' ' position{p} ' ' current{c} ' ' intensity{i} '.mat'];
                 load(name)
-                AGSICI_muscle_activity.muscles.data(p, c, i, s, :, :) = squeeze(data(:, 1:32, :, :, :, x_start:x_end));
+                AGSICI_muscle_activity.muscle.data(p, c, i, s, :, :) = squeeze(data(:, 1:32, :, :, :, x_start:x_end));
                 
-                % load and crop - N45 IC data
+                % load and crop - N45 IC 
                 name = [prefix_IC ' ' subj ' ' position{p} ' ' current{c} ' ' intensity{i} '.mat'];
                 load(name)
-                AGSICI_muscle_activity.N45.data(p, c, i, s, :, :) = squeeze(data(:, 1:32, :, :, :, x_start:x_end));
+                AGSICI_muscle_activity.N45.data(p, c, i, s, :, :) = squeeze(data(:, 1:32, :, :, :, x_start:x_end));            
             end 
         end
     end
@@ -523,6 +523,46 @@ end
 
 clear data_corr data_corr_ranked fig data_model data_model_ranked marker_col temp
 
+%% 9) tonic muscular activity
+% ----- adjustable parameters -----
+prefix_m_tonic = 'dc muscle ica visual crop but fft-notchfilt prefilt prea P1'; 
+x_end_tonic = (-0.005 - header.xstart)/xstep;
+% ----- adjustable parameters -----
+
+% extract RMS of baseline signal
+for p = 1:length(position)
+    for c = 1:length(current)
+        for i = 1:length(intensity)
+            for s = 1:length(subject)
+                % define subject
+                if subject(s) < 10
+                    subj = ['0' num2str(subject(s))];
+                else
+                    subj = num2str(subject(s));
+                end
+                
+                % load and crop baseline data
+                name = [prefix_m_tonic ' ' subj ' ' position{p} ' ' current{c} ' ' intensity{i} '.mat'];
+                load(name)
+                data = squeeze(data(:, 1:32, :, :, :, 1:x_end_tonic));
+                
+                % calculate RMS for each trial
+                for t = 1:size(data, 1)
+                    for e = 1:size(data, 2)
+                        rms(t, e) = sqrt(mean(data(t, e, :).^2));
+                    end
+                end
+                
+                % average RMS across trials and electrodes
+                AGSICI_muscle_activity.tonic(p, c, i, s) = mean(rms, 'all');                               
+            end
+        end
+    end
+end
+clear p c i s subj data t e rms
+
+% append new variables to the general MATLAB file
+save(results_folder, 'AGSICI_muscle_activity', '-append');
 %% functions
 function plot_TEP(x, data_visual, varargin)
 % check whether to plot labels 
