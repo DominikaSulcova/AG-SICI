@@ -88,7 +88,8 @@ switch answer
             disp('No colour scheme found in this directory!')    
         end
 end
-save('colours.mat', 'colours'); clear a answer
+save('colours.mat', 'colours'); 
+clear a answer
 
 % load a random header
 load([prefix ' 01 across normal stim_100.lw6'], '-mat')
@@ -925,7 +926,7 @@ end
 set(gca, 'fontsize', 14)
 ylim(yl)
 xlabel('time (s)')
-ylabel('power (\muV^2)')
+ylabel('potential (\muV)')
 end
 function topo_plot(header, data, x_pos, x_start, map_lims)
 varargin = {'maplimits' map_lims 'shading' 'interp' 'whitebk' 'on'};
@@ -948,7 +949,6 @@ end;
 topoplot(vector2,chanlocs2,varargin{:});
 set(gcf,'color',[1 1 1]);
 end
-
 function [pos_x, data, sub_data] = track_peak(data, header, time_window, k, s, TEP, buffer, seed)
 % figure params 
 figure_name = ['Subject n. ' num2str(s) ' - peak ' TEP.peak{k}] ;
@@ -1117,7 +1117,6 @@ pos_x = CP(1,1);
 
 end
 end
-
 function [amplitude, averaged_x, averaged_data] = TEP_amplitude(data, polarity, center, span, percent, step, xstart)
 % ------------------------------------------------------------------------
 % Fnc: Calculates mean amplitude of the most prominent <percent> of the TOI 

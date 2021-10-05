@@ -115,8 +115,8 @@ set(gca, 'Fontsize', 14)
 title(fig_title, 'FontWeight', 'bold', 'FontSize', 16)
 xlabel('stimulation intensity (% rMT)'); ylabel('TEP amplitude (\muV \pm SEM)');
 xlim([0.75, length(intensity) + 0.25])
-% leg = legend(perr, {'along STS - normal' 'along STS - reversed' 'across STS - normal' 'across STS - reversed'});
-% set(leg,'NumColumns',2,'Location','north');
+leg = legend(perr, {'along STS - normal' 'along STS - reversed' 'across STS - normal' 'across STS - reversed'});
+set(leg,'NumColumns',2,'Location','north');
 
 % save the figure       
 savefig([pwd '\' filename '_figs\' fig_name '.fig'])
