@@ -69,6 +69,8 @@ for s = 1:block_all
 end
 clear statement stim_order_N stim_order_R index s
 
+% stim_order(1:74, 2) = stim_order(2:75, 2);
+
 %% 2) rename events
 % loop through datasets
 for b = 1:length(block)
@@ -110,47 +112,46 @@ for i = 1:length(intensity)
     % split blocks according to current direction
     switch session_info{5}
         case '1 - normal  2 - reversed'
-            blocks2merge = [1:2:block(end); 2:2:block(end)];
+            blocks2merge = {[1:2:block(end)]; [2:2:block(end)]};
         case '1 - reversed  2 - normal'
-            blocks2merge = [2:2:block(end); 1:2:block(end)];
+            blocks2merge = {[2:2:block(end)]; [1:2:block(end)]};
     end
     
     % ----- normal current direction -----
     % merge data
-    merge_idx = 1:size(blocks2merge, 2);
+    merge_idx = 1:length(blocks2merge{1});
     datasets = struct;
-    for b = 1:size(blocks2merge, 2)
-        load([intensity{i} ' ' intensity{i}(end-2:end) ' ' name ' b' num2str(blocks2merge(1, b)) '.lw6'], '-mat');
+    for b = 1:length(blocks2merge{1})
+        load([intensity{i} ' ' intensity{i}(end-2:end) ' ' name ' b' num2str(blocks2merge{1}(b)) '.lw6'], '-mat');
         datasets(b).header = header;
-        load([intensity{i} ' ' intensity{i}(end-2:end) ' ' name ' b' num2str(blocks2merge(1, b)) '.mat']);
+        load([intensity{i} ' ' intensity{i}(end-2:end) ' ' name ' b' num2str(blocks2merge{1}(b)) '.mat']);
         datasets(b).data = data;
     end
     [header,data,message_string] = RLW_merge_epochs(datasets,merge_idx); 
     
     % save datasets
-    name_new = [session_info{1} ' ' session_info{2} ' ' session_info{4} ' normal ' intensity{i}];
+    name_new = ['raw ' session_info{1} ' ' session_info{2} ' ' session_info{4} ' normal ' intensity{i}];
     save([name_new '.mat'], 'data')
     header.name = name_new;
     save([name_new '.lw6'], 'header')   
     
     % ----- reversed current direction -----
     % merge data
-    merge_idx = 1:size(blocks2merge, 2);
+    merge_idx = 1:length(blocks2merge{2});
     datasets = struct;
-    for b = 1:size(blocks2merge, 2)
-        load([intensity{i} ' ' intensity{i}(end-2:end) ' ' name ' b' num2str(blocks2merge(2, b)) '.lw6'], '-mat');
+    for b = 1:length(blocks2merge{2})
+        load([intensity{i} ' ' intensity{i}(end-2:end) ' ' name ' b' num2str(blocks2merge{2}(b)) '.lw6'], '-mat');
         datasets(b).header = header;
-        load([intensity{i} ' ' intensity{i}(end-2:end) ' ' name ' b' num2str(blocks2merge(2, b)) '.mat']);
+        load([intensity{i} ' ' intensity{i}(end-2:end) ' ' name ' b' num2str(blocks2merge{2}(b)) '.mat']);
         datasets(b).data = data;
     end
     [header,data,message_string] = RLW_merge_epochs(datasets,merge_idx); 
     
     % save datasets
-    name_new = [session_info{1} ' ' session_info{2} ' ' session_info{4} ' reversed ' intensity{i}];
+    name_new = ['raw ' session_info{1} ' ' session_info{2} ' ' session_info{4} ' reversed ' intensity{i}];
     save([name_new '.mat'], 'data')
     header.name = name_new;
     save([name_new '.lw6'], 'header')
 end
 clear i b merge_idx data header message_string name_new
-
 
