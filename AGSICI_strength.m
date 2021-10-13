@@ -56,7 +56,7 @@ end
 % load the data
 load(data_path, data_var)
 
-% calculate GFP for each subject/condition
+% calculate GFP for each subject/orientatoion
 for p = 1:length(position)
     for c = 1:length(current)
         for s = 1:size(AGSICI_data, 4)    
@@ -65,7 +65,7 @@ for p = 1:length(position)
                 gfp_data(p, c, s, :, t) = mean(squeeze(AGSICI_data(p, c, :, s, :, t)), 1);
             end
 
-            % calculate GMFP
+            % calculate GFP
             GFP(p, c, s, :) = std(squeeze(gfp_data(p, c, s, 1:size(gfp_data, 4) - 1, :)), 1);
         end
     end
@@ -154,6 +154,7 @@ for p = 1:length(position)
     end
 end
 clear p c fig zl xl x_start x_end x_fill col P figure_name pos
+
 %% 2) plot - contrast coil position
 % merge 'current' conditions 
 for p = 1:length(position)

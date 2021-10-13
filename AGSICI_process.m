@@ -19,13 +19,13 @@
 %       - averages across intensities and plots mean + CI of all placement
 %       conditions in one figure
 % 
-% 3) calculate global mean field power from grand average
-%       - calculates GMFP and plots it, adds topoplots for peak
+% 3) calculate global field power from grand average
+%       - calculates GFP and plots it, adds topoplots for peak
 %       times, saves the figure
 %       - automatically identifies local peaks within [0.01 0.25]s and
 %       saves peak latencies in the outcome structure
 % 
-% 4) define peak widths using grand average GMFP - just informative 
+% 4) define peak widths using grand average GFP - just informative 
 %       - for each condition separately, plots and saves the figure 
 %       - uses function findpeaks awith the 'halfheight' option
 %       - saves peak widths in the outcome structure
@@ -103,7 +103,9 @@ x_start = (time_window(1) - header.xstart)/xstep;
 x_end = (time_window(2) - header.xstart)/xstep;
 
 % create folder for figures
-mkdir(pwd, [filename '_figs']);
+if ~exist([filename '_figs']) 
+    mkdir(pwd, [filename '_figs']);
+end
 
 clear c p 
 %% 1) load the data
@@ -146,7 +148,7 @@ clear A
 
 %% 2) preliminary TEP visualization 
 % ----- decide output parameters -----
-electrode = {'Cz' 'target'};
+electrode = {'target'};
 y_limits = [-4, 5.5];
 line_type = {':' '-.' '-'};
 % ------------------------------------
@@ -168,8 +170,8 @@ for p = 1:length(position)
         % average across intensities
         for e = 1:size(AGSICI_data, 5)
             for t = 1:size(AGSICI_data, 6)
-                gmfp_data(p, c, e, t) = mean(squeeze(AGSICI_data_mean(p, c, :, e, t)));
-                gmfp_CI(p, c, e, t) = mean(squeeze(AGSICI_data_CI(p, c, :, e, t)));
+                gfp_data(p, c, e, t) = mean(squeeze(AGSICI_data_mean(p, c, :, e, t)));
+                gfp_CI(p, c, e, t) = mean(squeeze(AGSICI_data_CI(p, c, :, e, t)));
             end
         end 
     end
@@ -235,20 +237,20 @@ for e = 1:length(electrode)
     hold on
     
     % shade interpolated interval 
-    plot(x, squeeze(gmfp_data(1, 1, find(contains(labels, electrode{e})), :)), 'b:', 'LineWidth', 0.5);
+    plot(x, squeeze(gfp_data(1, 1, find(contains(labels, electrode{e})), :)), 'b:', 'LineWidth', 0.5);
     rectangle('Position', [0, y_limits(1), 0.01, y_limits(2) - y_limits(1)], 'FaceColor', [0.75 0.75 0.75], 'EdgeColor', 'none')
         
     % loop through datasets
     for p = 1:length(position)
         for c = 1:length(current) 
             % prepare data
-            data_visual = squeeze(gmfp_data(p, c, find(contains(labels, electrode{e})), :))'; 
-            CI_visual = squeeze(gmfp_CI(p, c, find(contains(labels, electrode{e})), :))'; 
+            data_visual = squeeze(gfp_data(p, c, find(contains(labels, electrode{e})), :))'; 
+            CI_visual = squeeze(gfp_CI(p, c, find(contains(labels, electrode{e})), :))'; 
 
             % plot data     
             P((p - 1)*2 + c) = plot(x, data_visual, 'Color', colours((p - 1)*2 + c, :), 'LineWidth', 2.5);
-%             F((p - 1)*2 + c) = fill([x fliplr(x)],[data_visual + CI_visual fliplr(data_visual - CI_visual)], ...
-%                 colours((p - 1)*2 + c, :), 'FaceAlpha', alpha, 'linestyle', 'none');
+            F((p - 1)*2 + c) = fill([x fliplr(x)],[data_visual + CI_visual fliplr(data_visual - CI_visual)], ...
+                colours((p - 1)*2 + c, :), 'FaceAlpha', alpha, 'linestyle', 'none');
         end
     end
     
@@ -273,41 +275,55 @@ end
 clear e p c fig data_visual P F lgd figure_name CI_visual
 
 % save dataset to the global MATLAB file
-save([filename '.mat'], 'AGSICI_data_mean', 'AGSICI_data_CI', 'gmfp_data', 'gmfp_CI', '-append');
+save([filename '.mat'], 'AGSICI_data_mean', 'AGSICI_data_CI', 'gfp_data', 'gfp_CI', '-append');
 clear electrode AGSICI_data_CI 
 
-%% 3) GMFP
+%% 3) GFP
 % ----- decide output parameters -----
 labeled = 'off';
 max_peaks = 6;
 % ------------------------------------
 
-% loop through conditions, compute GMFP, plot
+% compute individual GFP
+AGSICI_GFP_subject = struct;
+for p = 1:length(position)
+    for c = 1:length(current)
+        for i = 1:length(intensity)
+            for s = 1:length(subject_order)
+                % calculate GFP (exclude target channel)
+                AGSICI_GFP_subject.data(p, c, i, s, :) = std(squeeze(AGSICI_data(p, c, i, s, 1:32, :)), 1);  
+            end
+        end
+    end
+end
+clear p c i s
+
+% compute grand average GFP, plot
 row_count = 1;
 for p = 1:length(position)
     for c = 1:length(current)
-        % calculate GMFP (exclude target channel)
-        AGSICI_GMFP(p, c, :) = std(squeeze(gmfp_data(p, c, 1:size(gmfp_data, 3) - 1, :)), 1);  
+        % calculate GFP (exclude target channel)
+        AGSICI_GFP(p, c, :) = std(squeeze(gfp_data(p, c, 1:size(gfp_data, 3) - 1, :)), 1);  
 
         % set dataset name + figure title
         fig_name = ['AG-SICI_GMFP_' position{p} '_' current{c}];
-        fig_title = ['GMFP: ' position{p} ' STS, ' current{c} ' current'];
+        fig_title = ['GFP: ' position{p} ' STS, ' current{c} ' current'];
 
-        % plot GMFP and extract peak latencies
+        % plot GFP and extract peak latencies
         fig = figure(figure_counter);
         hold on
 
         if ~isempty(max_peaks)
-        % plot GMFP
+        % plot GFP
         h_axis(1) = subplot(3, max_peaks, [1 : 2*max_peaks]);
-        AGSICI_TEP(row_count).latencies = gmfp_plot(x, squeeze(AGSICI_GMFP(p, c, :)), time_window, xstep, labeled, 'max_peaks', max_peaks);
+        AGSICI_TEP(row_count).latencies = gfp_plot(x, squeeze(AGSICI_GFP(p, c, :)), time_window, xstep, labeled, 'max_peaks', max_peaks);
         title(fig_title, 'fontsize', 16, 'fontweight', 'bold')
 
         % add topoplots
         for t = 1:length(AGSICI_TEP(row_count).latencies)
             % choose data for topoplot 
             for e = 1:size(AGSICI_data, 5)
-                data_topoplot(1, e, 1, 1, 1, :) = squeeze(gmfp_data(p, c, e, :));
+                data_topoplot(1, e, 1, 1, 1, :) = squeeze(gfp_data(p, c, e, :));
             end
             
             % plot the topoplot
@@ -324,7 +340,7 @@ for p = 1:length(position)
         end
 
         else
-            AGSICI_TEP(row_count).latencies(:) = gmfp_plot(x, squeeze(AGSICI_GMFP(p, c, :)), time_window, xstep, labeled);
+            AGSICI_TEP(row_count).latencies(:) = gfp_plot(x, squeeze(AGSICI_GFP(p, c, :)), time_window, xstep, labeled);
         end  
         hold off
 
@@ -340,8 +356,8 @@ end
 clear p c t h_axis pos fig_name fig_title row_count fig data_topoplot
 
 % append new variables to the general MATLAB file
-save([filename '.mat'], 'AGSICI_GMFP', 'AGSICI_TEP', '-append')
-clear labeled max_peaks gmfp_CI
+save([filename '.mat'], 'AGSICI_GFP', 'AGSICI_TEP', 'AGSICI_GFP_subject', '-append')
+clear labeled max_peaks gfp_CI
 
 %% 4) peak widths
 % ----- decide output parameters -----
@@ -358,7 +374,7 @@ row_count = 1;
 for p = 1:length(position)
     for c = 1:length(current)
         % choose data and x
-        data = squeeze(AGSICI_GMFP(p, c, x_start_narrow:x_end_narrow));
+        data = squeeze(AGSICI_GFP(p, c, x_start_narrow:x_end_narrow));
 
         % identify peak widths
         [P, L, AGSICI_TEP(row_count).widths, R] = findpeaks(data, 'Annotate','extents', ...
@@ -567,10 +583,9 @@ else
     end
 end
 
-%% 6) amplitude
+%% 6) GFP amplitude
 % ----- decide output parameters -----
-POI = {'P25' 'N45'};                                % peaks of interest
-EOI = {'target' 'FC1'};                             % electrodes of interest
+POI = {'P25'};                                      % peaks of interest
 percent = 20;                                       % % of timepoints included in the mean amplitude calculation
 % ------------------------------------
 
@@ -588,10 +603,8 @@ for s = 1:length(subject_order)
             % setup names   
             figure_title = ['Subject n. ' num2str(subject_order(s)) ' : ' position{p} ' STS, ' current{c} ' current'];                                       
             if subject_order(s) < 10
-%                 file_name = ['AG-SICI_amplitude_S0' num2str(subject_order(s)) '_' position{p} '_' current{c}];
                 file_name = ['AG-SICI_S0' num2str(subject_order(s)) '_' position{p} '_' current{c}];
             else
-%                 file_name = ['AG-SICI_amplitude_S' num2str(subject_order(s)) '_' position{p} '_' current{c}];
                 file_name = ['AG-SICI_S' num2str(subject_order(s)) '_' position{p} '_' current{c}];
             end
             
@@ -605,10 +618,8 @@ for s = 1:length(subject_order)
             for i = 1:length(intensity)
                 % loop through peaks
                 for k = 1:length(POI)                      
-                    % choose TEP data 
-                    peak_n = find(contains(AGSICI_TEP_avg.peak, POI{k}));
-                    electrode_n = find(contains(labels, EOI{k}));
-                    data_visual = double(squeeze(AGSICI_data(p, c, i, s, electrode_n, :))); 
+                    % choose data 
+                    data_visual = double(squeeze(AGSICI_GFP_subject.data(p, c, i, s, :))); 
                     
                     % choose data for topoplot 
                     for e = 1:size(AGSICI_data, 5)
@@ -616,7 +627,8 @@ for s = 1:length(subject_order)
                     end
 
                     % define default TOI 
-                    center = AGSICI_TEP_subject(s).latency(p, c, peak_n);
+                    peak_n = find(contains(AGSICI_TEP_avg.peak, POI{k}));
+                    center = AGSICI_TEP_avg.center(peak_n);
                     span = AGSICI_TEP_avg.width(peak_n);
                     
                     % set the final TOI
@@ -641,17 +653,9 @@ for s = 1:length(subject_order)
                         % visualize default peak TOI
                         subplot(4, 6, [7:24])
                         rectangle('Position', [center - span/2, yl(1), span, yl(2)-yl(1)], 'FaceColor', [1,0.7608,0.7608], 'EdgeColor', 'none')
-
-                        % define the polarity of current peak 
-                        switch POI{k}(1)
-                            case 'P'
-                                polarity = 'positive';
-                            case 'N'
-                                polarity = 'negative';
-                        end  
                         
                         % calculate mean amplitude
-                        [amplitude, averaged_x, averaged_data] = TEP_amplitude(data_visual', polarity, center, span, percent, xstep, time_window(1)); 
+                        [amplitude, averaged_x, averaged_data] = GFP_amplitude(data_visual', center, span, percent, xstep, time_window(1)); 
 
                         % calculate  real peak latency (round up)
                         central_latency = averaged_x(ceil(length(averaged_x)/2));
@@ -699,7 +703,7 @@ for s = 1:length(subject_order)
                                 choose_x = (choose_center - choose_span/2) : xstep : (choose_center + choose_span/2);
 
                                 % prepare data and header for visualization
-                                choose_data = double(squeeze(AGSICI_data(p, c, i, s, electrode_n, choose_x1 : choose_x2)));
+                                choose_data = double(squeeze(AGSICI_GFP_subject.data(p, c, i, s, choose_x1 : choose_x2)));
                                 choose_header = header;
                                 choose_header.datasize(6) = length(choose_data);  
                                 choose_header.xstart = choose_center - choose_span/2;
@@ -760,8 +764,8 @@ for s = 1:length(subject_order)
                     clear fig_1 choose_header choose_map_lims choose_span choose_x choose_x1 choose_x2 l
                     
                     % record outcome variables
-                    AGSICI_TEP_subject(s).latency_real(p, c, i, peak_n) = central_latency;  
-                    AGSICI_TEP_subject(s).amplitude(p, c, i, peak_n) = amplitude; 
+                    AGSICI_GFP_subject.latency(p, c, i, s, peak_n) = central_latency;  
+                    AGSICI_GFP_subject.amplitude(p, c, i, s, peak_n) = amplitude; 
                                         
                     % set up figure
                     r = (i - 1)*6;
@@ -820,6 +824,7 @@ for s = 1:length(subject_order)
             figure_counter = figure_counter + 1;   
         end
     end
+    
     % play a celebratory sound at the end of each participant
     tune = load('handel.mat');
     sound(tune.y, tune.Fs)
@@ -829,24 +834,23 @@ clear p c i s k e a f g h r electrode_n peak_n figure_title file_name data_visua
     finish answer choose_fig choose_axesHandles choose_center choose_data choose_figure_name pos_x tune    
 
 % save data in a R-compatible table 
-if exist('AGSICI_outcome') == 0
-    AGSICI_outcome = table;
+if ~exist('AGSICI_GFP_amp')
+    AGSICI_GFP_amp = table;
 end
-
-row_counter = height(AGSICI_outcome) + 1;
+row_counter = height(AGSICI_GFP_amp) + 1;
 for s = 1:length(subject_order) 
     for p = 1:length(position)  
         for c = 1:length(current)
             for i = 1:length(intensity)
                 for k = 1:length(POI) 
                     %fill in the table
-                    AGSICI_outcome.subject(row_counter) = subject_order(s);
-                    AGSICI_outcome.position(row_counter) = position(p);
-                    AGSICI_outcome.current(row_counter) = current(c);
-                    AGSICI_outcome.intensity(row_counter) = str2double(intensity{i}(end-2 : end));
-                    AGSICI_outcome.peak(row_counter) = POI(k);
-                    AGSICI_outcome.amplitude(row_counter) = AGSICI_TEP_subject(s).amplitude(p, c, i, k);
-                    AGSICI_outcome.latency(row_counter) = AGSICI_TEP_subject(s).latency_real(p, c, i, k);
+                    AGSICI_GFP_amp.subject(row_counter) = subject_order(s);
+                    AGSICI_GFP_amp.position(row_counter) = position(p);
+                    AGSICI_GFP_amp.current(row_counter) = current(c);
+                    AGSICI_GFP_amp.intensity(row_counter) = str2double(intensity{i}(end-2 : end));
+                    AGSICI_GFP_amp.peak(row_counter) = POI(k);
+                    AGSICI_GFP_amp.amplitude(row_counter) = AGSICI_GFP_subject.amplitude(p, c, i, s, k);
+                    AGSICI_GFP_amp.latency(row_counter) = AGSICI_GFP_subject.latency(p, c, i, s, k);
                     
                     % update the counter
                     row_counter = row_counter + 1;
@@ -856,14 +860,14 @@ for s = 1:length(subject_order)
     end
 end
 clear s p c i k row_counter
-writetable(AGSICI_outcome, 'AGSICI_outcome.csv')
+writetable(AGSICI_GFP_amp, 'AGSICI_GFP_amp.csv')
 
 % append new variables to the general MATLAB file
-save([filename '.mat'], 'AGSICI_TEP_subject', 'AGSICI_outcome', '-append');
-clear POI EOI percent
+save([filename '.mat'], 'AGSICI_GFP_subject', 'AGSICI_GFP_amp', '-append');
+clear POI percent
 
 %% functions
-function peak_x = gmfp_plot(x, y, time_window, xstep, labeled, varargin)
+function peak_x = gfp_plot(x, y, time_window, xstep, labeled, varargin)
 % check whether to plot labels (default)
 if ~isempty(varargin)
     a = find(strcmpi(varargin, 'max_peaks'));
@@ -926,7 +930,7 @@ end
 set(gca, 'fontsize', 14)
 ylim(yl)
 xlabel('time (s)')
-ylabel('potential (\muV)')
+ylabel('GFP (\muV)')
 end
 function topo_plot(header, data, x_pos, x_start, map_lims)
 varargin = {'maplimits' map_lims 'shading' 'interp' 'whitebk' 'on'};
@@ -1117,14 +1121,13 @@ pos_x = CP(1,1);
 
 end
 end
-function [amplitude, averaged_x, averaged_data] = TEP_amplitude(data, polarity, center, span, percent, step, xstart)
+function [amplitude, averaged_x, averaged_data] = GFP_amplitude(data, center, span, percent, step, xstart)
 % ------------------------------------------------------------------------
 % Fnc: Calculates mean amplitude of the most prominent <percent> of the TOI 
 %       --> TOI defined by the center value and the span of the time window
 % 
 % Input: 
-%   data - vector of values (double), signal from target electrode
-%   polarity -  string, values: 'positive', 'negative' - according to TEP peak  
+%   data - vector of values (double), GFP 
 %   center, span - num values that define the TOI
 %   percent - how many top percent of datapoints will be included in the average
 %   step, xstart - defines properties of time axes 
@@ -1143,13 +1146,8 @@ data_crop = data(start : stop);
 % calculate number of points to average
 points_number = ceil((percent/100) * length(data_crop));
 
-% sort the data according to peak polarity
-switch polarity
-    case 'positive'
-        data_sorted = sort(data_crop, 'descend');        
-    case 'negative'
-        data_sorted = sort(data_crop); 
-end
+% sort the data 
+data_sorted = sort(data_crop, 'descend');        
 
 % calculate the mean value
 points_included = data_sorted(1:points_number);
