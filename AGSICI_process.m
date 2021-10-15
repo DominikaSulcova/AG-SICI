@@ -306,7 +306,7 @@ for p = 1:length(position)
         AGSICI_GFP(p, c, :) = std(squeeze(gfp_data(p, c, 1:size(gfp_data, 3) - 1, :)), 1);  
 
         % set dataset name + figure title
-        fig_name = ['AG-SICI_GMFP_' position{p} '_' current{c}];
+        fig_name = ['AG-SICI_GFP_' position{p} '_' current{c}];
         fig_title = ['GFP: ' position{p} ' STS, ' current{c} ' current'];
 
         % plot GFP and extract peak latencies
