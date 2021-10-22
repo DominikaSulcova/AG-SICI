@@ -1,39 +1,101 @@
 %% AG-SICI: MUSCULAR CONTRIBUTION TO TEP COMPONENT N45
 % Written by Dominika for GABA-AD project (2021)
 % 
-% ----- muscle contraction X N45 -----
+% ----- muscle contraction X N45: visualization -----
 % 1) prepares the data
 %    - loads preprocessed data from letswave
 %       - raw datasets to identify early muscular contraction  
-%       - GFP of processed datasets to identify N45 
-%    - crops the raw data in predefined time window
+%       - GFP of fully processed datasets to identify N45 
+%    - crops the data in predefined time window
 %       - default [-0.05, 0.3]s
 %   - saves to the output structure --> 'AGSICI_muscle_activity'
 % 
 % 2) calculates GFP
 %   - GFP of individual datasets
-%   - mean GFP per condition
+%   - mean GFP per condition - all subjects included
 %   - exports in letswave format for browsing
 %   - saves to the output structure and appends to global matlab file
 % 
-% 3) plots mean GFP 
-%   - GFP of muscle contraction and N45 in one figure
-%   - shades TOIs of interest
-%   - saves as .fig and .png to the output folder
+% 3) calculates the area under the curve for predefined time windows 
+%   - default TOI for muscular contraction: [0.003, 0.01]s
+%   - default TOI for N45: [0.035, 0.055]s
+%   - saves to the output structure and appends to global matlab file
 % 
-% 4) 
+% 4) exports individual AUC values for R
+%   - saves as a long-formate .csv table --> 'AGSICI_cont_X_N45'
 % 
-% 5)
+% 5) plots mean AUC values - all subjects included
+%   - line and errorbar plot
+%   - saves to the output folder as .fig and .png --> 'AGSICI_cont/N45_all'
 % 
-% 6) exports for R 
-%   - saves extracted values in a long format .csv table 'AGSICI_cont_X_N45'
+% 6) muscular contraction: identifies outliers
+%   - averages across intensities
+%   - boxplot, visualize measures per stimulation orientation 
+%   - identifies outliers 
+%   - saves to the output folder as .fig and .png --> 'AGSICI_cont_size'
 % 
-% 7) plots mean values
-%   - separate line plots for muscle contraction and N45
-%   - saves as .fig and .png to the output folder
+% 7) plots mean GFP values - without outliers
+%   - calculates index to exclude outliers
 % 
-% 8) overall correlation
-%   -
+% 8) saves GFP for letswave for browsing 
+%   - individual GFP data --> 'merged muscle contraction/N45 ...'
+%   - averaged GFP data --> 'avg merged muscle contraction/N45 ...'
+% 
+% 9) plots mean GFP - without outliers
+%   - 1 figure per orientation, separate lines per intensity
+%   - contraction and N45 GFP in 2 plots within the same figure
+%   - highlights TOIs
+%   - saves to the output folder as .fig and .png --> 'AGSICI_GFP_position_current_WO'
+% 
+% 10) plots mean AUC values - without outliers
+%   - line and errorbar plot
+%   - saves to the output folder as .fig and .png --> 'AGSICI_cont/N45_all_WO'
+% 
+% 11) muscular contraction: plots AUC values per oritentation - without outliers
+%   - averages across intensities
+%   - boxplot, visualize measures per stimulation orientation 
+%   - saves to the output folder as .fig and .png --> 'AGSICI_cont_size_WO'
+% 
+% 12) muscular contraction: stratifies - without outliers
+%   - splits all data into 4 groups by growing muscular contraction
+%   - saves for letswave to visualize topographies
+%   - plots stacked barplots to visualize ratio of coil position and 
+%       stimulation intensity per group
+%   - saves to the output folder as .fig and .png -->
+%   'AGSICI_cont_counts_position/intensity_WO'
+% 
+% 13) muscular contraction: stratifies per condition - without outliers
+%   - separate stratification for each condition (intensity OR orientation) 
+%   - splits data into 2 groups by growing muscular contraction
+%   - saves for letswave to visualize topographies
+%
+% ----- muscle contraction X N45: correlation -----
+% 14) plots overall correlation - without outliers
+%   - pools all datasets together
+%   - colorcodes for orientation
+%   - linear correlation --> Pearson
+%   - correlation of ranked data --> Spearman 
+% 
+% 15) plots correlation per orientation - without outliers
+%   - linear correlation --> Pearson
+%   - correlation of ranked data --> Spearman 
+% 
+% 16) plots correlation per intensity - without outliers
+%   - linear correlation --> Pearson
+%   - correlation of ranked data --> Spearman 
+% 
+% ----- tonic muscular activity -----
+% 17) extracts and exports data
+%   - loads preprocessed datasets from letswave --> data based on identifies 
+%       muscular components from the second run of ICA 
+%   - calculates root-mean-squared of baseline data for each trial, then averages over
+%       trials and electrodes
+%   - exports mean RMS in a long-format .csv table --> 'AGSICI_tonic'
+%   - saves to the output structure and appends to global matlab file
+% 
+% 18) plots mean RMS per conditions
+%   - barplot for all conditions --> 'AGSICI_tonic_bl_all'
+%   - boxplot per orientation --> 'AGSICI_tonic_bl'
 
 %% parameters
 clear all; clc
@@ -75,9 +137,9 @@ save('colours.mat', 'colours');
 clear a c p answer
 
 % create output folder
-output_folder = [uigetdir(pwd, 'Choose the directory with the global output file') '\AG-SICI_muscles'];
+output_folder = [uigetdir(pwd, 'Choose the directory with the output folder') '\AG-SICI_muscles'];
 if ~exist(output_folder) 
-    mkdir(pwd, 'AG-SICI_muscles')
+    mkdir(output_folder)
 end    
 
 % identify matlab file with results
@@ -88,10 +150,13 @@ load(results_file, 'header')
 
 % visualization 
 figure_counter = 1;
-xstep = header.xstep; 
+xstep = header.xstep;
+answer = inputdlg('Raw data: starting timepoint (in s)', 'Cropping the raw data', [1, 20], {'-0.75'});
+eval(['xstart = ' answer{1} ';']);
 x = [time_window(1):xstep:time_window(2)];
-x_start = (time_window(1) - header.xstart)/xstep;
-x_end = (time_window(2) - header.xstart)/xstep;
+x_start = (time_window(1) - xstart)/xstep;
+x_end = (time_window(2) - xstart)/xstep;
+clear answer
 
 %% 1) muscle contraction X N45: prepare individual GFP
 % ----- adjustable parameters -----
@@ -290,6 +355,7 @@ figure_counter = figure_counter + 1;
 clear fig leg perr y SEM
 
 %% 6) muscle contraction: distribution across conditions - all subjects 
+% ----- barplot -----
 % calculate mean values to plot
 for i = 1:length(intensity)
     for p = 1:length(position)
@@ -325,6 +391,7 @@ saveas(fig, [output_folder '\AGSICI_cont_size_all.png'])
 figure_counter = figure_counter + 1;
 clear fig yl barplot a data_visual 
 
+% ----- boxplot per orientation -----
 % average across intensities
 for p = 1:length(position)
     for c = 1:length(current)
@@ -333,7 +400,7 @@ for p = 1:length(position)
 end
 clear p c
 
-% plot average RMS - boxplot
+% plot  
 fig = figure(figure_counter); ax = gca;       
 hold on
 boxplot(data_visual, 'color', colours)
@@ -377,7 +444,7 @@ saveas(fig, [output_folder '\AGSICI_cont_size.png'])
 figure_counter = figure_counter + 1;
 clear fig ax scat b data_visual 
 
-%% 7) muscle contraction X N45: calculate mean GFP, save for LW
+%% 7) muscle contraction X N45: calculate mean GFP - without outliers
 % ----- adjustable parameters -----
 outliers = [5 8 12];
 % ----- adjustable parameters -----
@@ -591,14 +658,15 @@ yl = get(gca, 'ylim');
 text(2.1, yl(2) - 8, sprintf('without outliers:\nsubj. %d, %d, %d', outliers(1), outliers(2), outliers(3)), 'FontSize', 14)
 
 % save the figure       
-savefig([output_folder '\AGSICI_N45_all.fig'])
-saveas(fig, [output_folder '\AGSICI_N45_all.png'])
+savefig([output_folder '\AGSICI_N45_all_WO.fig'])
+saveas(fig, [output_folder '\AGSICI_N45_all_WO.png'])
 
 % update the counter
 figure_counter = figure_counter + 1;  
 clear fig leg perr y SEM yl
 
 %% 11) muscle contraction: distribution across conditions - without outliers
+% ----- barplot -----
 % calculate mean values to plot
 for i = 1:length(intensity)
     for p = 1:length(position)
@@ -634,6 +702,7 @@ saveas(fig, [output_folder '\AGSICI_cont_size_all_WO.png'])
 figure_counter = figure_counter + 1;
 clear fig yl barplot a data_visual 
 
+% ----- boxplot per orientation -----
 % average across intensities
 for p = 1:length(position)
     for c = 1:length(current)
@@ -672,7 +741,234 @@ saveas(fig, [output_folder '\AGSICI_cont_size_WO.png'])
 figure_counter = figure_counter + 1;
 clear fig ax scat b data_visual 
 
-%% 12) muscle contraction X N45: overall correlation - without outliers
+%% 12) muscle contraction: stratification - without outliers
+% ----- adjustable parameters -----
+prefix_m_cont = 'avg avgchan bl icfilt-plus ica visual crop but fft-notchfilt prefilt prea P1'; 
+% ----- adjustable parameters -----
+% load the data
+data_table = readtable([output_folder '\AGSICI_cont_X_N45_WO_grouped.csv']);
+
+% split data to groups by size of contraction
+data_1 = []; data_2 = []; data_3 = []; data_4 = []; 
+case_counter = zeros(4, 2, 3);
+for a = 1:height(data_table)
+    % identify dataset
+    orientation = char(data_table.orientation(a));
+    if strcmp(orientation(1:3), 'alo')
+        p = 1; 
+    elseif strcmp(orientation(1:3), 'acr')
+        p = 2;
+    end
+    if strcmp(orientation(end-2:end), 'mal')
+        c = 1;
+    elseif strcmp(orientation(end-2:end), 'sed')
+        c = 2;
+    end
+    for b = 1:length(intensity)
+        if str2double(intensity{b}(end-2:end)) == data_table.intensity(a)
+            i = b;
+        end
+    end    
+    if data_table.subject(a) < 10
+        subj = ['0' num2str(data_table.subject(a))];
+    else
+        subj = num2str(data_table.subject(a));
+    end
+    
+    % fill in counter
+    case_counter(data_table.group(a), p, i) =  case_counter(data_table.group(a), p, i) + 1;   
+    
+    % load the processed dataset
+    dataset_name = [prefix_m_cont ' ' subj ' ' position{p} ' ' current{c} ' ' intensity{i} '.mat'];
+    load(dataset_name)
+    
+    % append data to the group variable  
+    statement = ['data_' num2str(data_table.group(a)) '(end+1, :, 1, 1, 1, :) = squeeze(data(:, 1:32, :, :, :, x_start:x_end));'];
+    eval(statement)
+end
+clear a b c p i orientation 
+
+% modify header
+header.datasize = size(data_1);
+header.xstart = time_window(1);
+header.chanlocs = header.chanlocs(1:32);
+
+% save for letswave
+for d = 1:4
+    statement = ['data = data_' num2str(d) ';'];
+    eval(statement)
+    header.name = ['merged muscle contraction group_' num2str(d) ' WO'];
+    save([header.name '.mat'], 'data')
+    save([header.name '.lw6'], 'header')
+end
+clear d statement data_1 data_2 data_3 data_4
+
+% ----- counts per position -----
+data_visual = squeeze(sum(case_counter(:, :, :), 3));
+fig = figure(figure_counter);
+hold on
+barplot = bar(data_visual, 'stacked', 'EdgeColor', 'none');
+for a = 1:size(data_visual, 2)
+    barplot(a).FaceColor = colours(a, :);
+end
+legend(barplot, {'along' 'across'}, 'Location', 'bestoutside', 'fontsize', 14)
+title('stimulation orientation:')
+xlabel('muscular contraction')
+ylabel('count')
+set(gca, 'xtick', 1:4, 'xticklabel', {'smallest' '' '' 'largest'})
+set(gca, 'Fontsize', 14)
+yl = get(gca, 'ylim');
+ylim([yl(1) yl(2) + 10])
+text(1.5, yl(2)+5, 'without outliers', 'FontSize', 14)
+hold off
+
+% save the figure
+savefig([output_folder '\AGSICI_cont_counts_position_WO.fig'])
+saveas(fig, [output_folder '\AGSICI_cont_counts_position_WO.png'])
+
+% update figure counter
+figure_counter = figure_counter + 1;
+clear a fig barplot data_visual 
+
+% ----- counts per intensity -----
+col = [0.24 0.49 0.99; 0.72 0.27 1; 0.87 0.16 0.40];
+data_visual = squeeze(sum(case_counter(:, :, :), 2));
+fig = figure(figure_counter);
+hold on
+barplot = bar(data_visual, 'stacked', 'EdgeColor', 'none');
+for a = 1:size(data_visual, 2)
+    barplot(a).FaceColor = col(a, :);
+end
+legend(barplot, {'100 %rMT' '120 %rMT' '140 %rMT'}, 'Location', 'bestoutside', 'fontsize', 14)
+title('stimulation intensity:')
+xlabel('muscular contraction')
+ylabel('count')
+set(gca, 'xtick', 1:4, 'xticklabel', {'smallest' '' '' 'largest'})
+set(gca, 'Fontsize', 14)
+yl = get(gca, 'ylim');
+ylim([yl(1) yl(2) + 10])
+text(1.5, yl(2)+5, 'without outliers', 'FontSize', 14)
+hold off
+
+% save the figure
+savefig([output_folder '\AGSICI_cont_counts_intensity_WO.fig'])
+saveas(fig, [output_folder '\AGSICI_cont_counts_intensity_WO.png'])
+
+% update figure counter
+figure_counter = figure_counter + 1;
+clear col a fig barplot data_visual 
+ 
+%% 13) muscle contraction: stratification per factors, without outliers
+% split by intensity
+for i = 1:length(intensity)
+    data_1 = []; data_2 = []; 
+    
+    % subset the table
+    rows = data_table.intensity == str2double(intensity{i}(end-2:end));
+    data_table_int = data_table(rows, :);
+    
+    % re-assign to groups
+    data_table_int.group(1:floor(height(data_table_int)/2)) = 1;
+    data_table_int.group(floor(height(data_table_int)/2):end) = 2;
+    
+    % extract the data
+    for a = 1:height(data_table_int)
+        % identify dataset
+        orientation = char(data_table_int.orientation(a));
+        if strcmp(orientation(1:3), 'alo')
+            p = 1; 
+        elseif strcmp(orientation(1:3), 'acr')
+            p = 2;
+        end
+        if strcmp(orientation(end-2:end), 'mal')
+            c = 1;
+        elseif strcmp(orientation(end-2:end), 'sed')
+            c = 2;
+        end 
+        if data_table_int.subject(a) < 10
+            subj = ['0' num2str(data_table_int.subject(a))];
+        else
+            subj = num2str(data_table_int.subject(a));
+        end 
+
+        % load the processed dataset
+        dataset_name = [prefix_m_cont ' ' subj ' ' position{p} ' ' current{c} ' ' intensity{i} '.mat'];
+        load(dataset_name)
+        
+        % append data to the group variable 
+        statement = ['data_' num2str(data_table_int.group(a)) '(end+1, :, 1, 1, 1, :) = squeeze(data(:, 1:32, :, :, :, x_start:x_end));'];
+        eval(statement)
+
+    end
+    
+    % save for letswave
+    for d = 1:2
+        statement = ['data = data_' num2str(d) ';'];
+        eval(statement)
+        header.name = ['merged muscle contraction ' intensity{i} ' group_' num2str(d) ' WO'];
+        header.datasize = size(data);
+        save([header.name '.mat'], 'data')
+        save([header.name '.lw6'], 'header')
+    end
+    clear d statement data_1 data_2 
+end
+clear a c p i data_table_int 
+
+% split by orientation
+orientation = {'along-normal' 'along-reversed' 'across-normal' 'across-reversed'};
+for p = 1:length(position)
+    for c = 1:length(current)
+        data_1 = []; data_2 = []; 
+
+        % subset the table
+        rows = strcmp(data_table.orientation, orientation{(p-1)*2+c});
+        data_table_ori = data_table(rows, :);
+
+        % re-assign to groups
+        data_table_ori.group(1:round(height(data_table_ori)/2)) = 1;
+        data_table_ori.group(round(height(data_table_ori)/2)+1:end) = 2;
+
+        % extract the data
+        for a = 1:height(data_table_ori)
+            % identify intensity
+            for b = 1:length(intensity)
+                if str2double(intensity{b}(end-2:end)) == data_table_ori.intensity(a)
+                    i = b;
+                end
+            end 
+            
+            % identify subject
+            if data_table_ori.subject(a) < 10
+                subj = ['0' num2str(data_table_ori.subject(a))];
+            else
+                subj = num2str(data_table_ori.subject(a));
+            end 
+
+            % load the processed dataset
+            dataset_name = [prefix_m_cont ' ' subj ' ' position{p} ' ' current{c} ' ' intensity{i} '.mat'];
+            load(dataset_name)
+
+            % append data to the group variable 
+            statement = ['data_' num2str(data_table_ori.group(a)) '(end+1, :, 1, 1, 1, :) = squeeze(data(:, 1:32, :, :, :, x_start:x_end));'];
+            eval(statement)
+
+        end
+
+        % save for letswave
+        for d = 1:2
+            statement = ['data = data_' num2str(d) ';'];
+            eval(statement)
+            header.name = ['merged muscle contraction ' position{p} ' ' current{c} ' group_' num2str(d) ' WO'];
+            header.datasize = size(data);
+            save([header.name '.mat'], 'data')
+            save([header.name '.lw6'], 'header')
+        end
+        clear d statement data_1 data_2 
+    end
+end
+clear a b c p i data_table_ori prefix_m_cont
+
+%% 14) muscle contraction X N45: overall correlation - without outliers
 % extract data
 data_corr_m = [];
 data_corr_N45 = [];
@@ -727,7 +1023,7 @@ data_model_ranked = fitlm(data_corr_ranked(:, 1), data_corr_ranked(:, 2), 'VarNa
 fig = figure(figure_counter);
 hold on
 plot_corr(data_model_ranked, data_corr_ranked, marker_col, 'Spearman')
-title('Non-linear correlation: ranked data', 'FontWeight', 'bold', 'FontSize', 16)
+title('Ranked data:', 'FontWeight', 'bold', 'FontSize', 16)
 
 % save the figure       
 savefig([output_folder '\AGSICI_cont_corr_all_WO_ranked.fig'])
@@ -738,7 +1034,7 @@ figure_counter = figure_counter + 1;
 
 clear data_corr data_corr_ranked fig data_model data_model_ranked marker_col temp
 
-%% 13) muscle contraction X N45: correlation per orientation - without outliers
+%% 15) muscle contraction X N45: correlation per orientation - without outliers
 for p = 1:length(position)
     for c = 1:length(current)       
         % extract data
@@ -792,7 +1088,7 @@ for p = 1:length(position)
         fig = figure(figure_counter);
         hold on
         plot_corr(data_model_ranked, data_corr_ranked, marker_col, 'Spearman')
-        title(sprintf('Non-linear correlation: %s - %s', position{p}, current{c}), 'FontWeight', 'bold', 'FontSize', 16)
+        title(sprintf('Ranked data: %s - %s', position{p}, current{c}), 'FontWeight', 'bold', 'FontSize', 16)
 
         % save the figure       
         savefig([output_folder '\AGSICI_cont_corr_ranked_' position{p} '-' current{c} '_WO.fig'])
@@ -804,7 +1100,7 @@ for p = 1:length(position)
 end
 clear p c data_corr data_corr_ranked fig data_model data_model_ranked marker_col temp
 
-%% 14) muscle contraction X N45: correlation per intensity - without outliers 
+%% 16) muscle contraction X N45: correlation per intensity - without outliers 
 % choose colours
 marker_col = [];
 for a = 1:length(position) * length(current)
@@ -862,7 +1158,7 @@ for i = 1:length(intensity)
     fig = figure(figure_counter);
     hold on
     plot_corr(data_model_ranked, data_corr_ranked, marker_col, 'Spearman')
-    title(sprintf('Non-linear correlation, ranked: %s %%rMT', intensity{i}(end-2:end)), 'FontWeight', 'bold', 'FontSize', 16)
+    title(sprintf('Ranked data: %s %%rMT', intensity{i}(end-2:end)), 'FontWeight', 'bold', 'FontSize', 16)
 
     % save the figure       
     savefig([output_folder '\AGSICI_cont_corr_int_' intensity{i}(end-2:end) '_WO_ranked.fig'])
@@ -873,10 +1169,10 @@ for i = 1:length(intensity)
 end
 clear data_corr data_corr_ranked fig data_model data_model_ranked marker_col temp
 
-%% ) tonic muscular activity - extract/export data
+%% 17) tonic muscular activity: extract/export data
 % ----- adjustable parameters -----
 prefix_m_tonic = 'dc muscle ica visual crop but fft-notchfilt prefilt prea P1'; 
-x_end_tonic = (-0.005 - header.xstart)/xstep;
+x_end_tonic = (-0.005 - 0.75)/xstep;
 % ----- adjustable parameters -----
 
 % extract RMS of baseline signal
@@ -938,7 +1234,7 @@ clear p c s i row_cnt
 % append new variables to the general MATLAB file
 save(results_file, 'AGSICI_muscle_activity', 'AGSICI_tonic', '-append');
 
-%% ) tonic muscular activity - plot
+%% 18) tonic muscular activity - plot
 % calculate mean values to plot
 for i = 1:length(intensity)
     for p = 1:length(position)
@@ -1007,423 +1303,6 @@ saveas(fig, [output_folder '\AGSICI_tonic_bl.png'])
 % update figure counter
 figure_counter = figure_counter + 1;
 clear fig ax scat b data_visual 
-
-%% 13) muscle contraction: stratification, all subjects included
-% ----- adjustable parameters -----
-prefix_m_cont = 'avg avgchan bl icfilt-plus ica visual crop but fft-notchfilt prefilt prea P1'; 
-% ----- adjustable parameters -----
-% split data to groups by size of contraction
-data_table = AGSICIcontXN45;
-data_1 = []; data_2 = []; data_3 = []; data_4 = []; 
-case_counter = ones(4, 2, 3);
-for a = 1:height(data_table)
-    % identify dataset
-    orientation = char(data_table.orientation(a));
-    if strcmp(orientation(1:3), 'alo')
-        p = 1; 
-    elseif strcmp(orientation(1:3), 'acr')
-        p = 2;
-    end
-    if strcmp(orientation(end-2:end), 'mal')
-        c = 1;
-    elseif strcmp(orientation(end-2:end), 'sed')
-        c = 2;
-    end
-    for b = 1:length(intensity)
-        if str2double(intensity{b}(end-2:end)) == data_table.intensity(a)
-            i = b;
-        end
-    end    
-    if data_table.subject(a) < 10
-        subj = ['0' num2str(data_table.subject(a))];
-    else
-        subj = num2str(data_table.subject(a));
-    end
-    
-    % fill in counter
-    case_counter(data_table.contractioncategory(a), p, i) =  case_counter(data_table.contractioncategory(a), p, i) + 1;   
-    
-%     % load the processed dataset
-%     dataset_name = [prefix_m_cont ' ' subj ' ' position{p} ' ' current{c} ' ' intensity{i} '.mat'];
-%     load(dataset_name)
-%     
-%     % append data to the group variable  
-%     statement = ['data_' num2str(data_table.contractioncategory(a)) '(end+1, :, 1, 1, 1, :) = squeeze(data(:, 1:32, :, :, :, x_start:x_end));'];
-%     eval(statement)
-end
-clear a b c p i orientation 
-
-% modify header
-header.datasize = size(data_1);
-header.xstart = time_window(1);
-header.chanlocs = header.chanlocs(1:32);
-
-% save for letswave
-for d = 1:4
-    statement = ['data = data_' num2str(d) ';'];
-    eval(statement)
-    header.name = ['merged muscle contraction group_' num2str(d)];
-    save([header.name '.mat'], 'data')
-    save([header.name '.lw6'], 'header')
-end
-clear d statement data_1 data_2 data_3 data_4
-
-% ----- counts per position -----
-data_visual = squeeze(sum(case_counter(:, :, :), 3));
-fig = figure(figure_counter);
-hold on
-barplot = bar(data_visual, 'stacked', 'EdgeColor', 'none');
-for a = 1:size(data_visual, 2)
-    barplot(a).FaceColor = colours(a, :);
-end
-legend(barplot, {'along' 'across'}, 'Location', 'bestoutside', 'fontsize', 14)
-xlabel('muscular contraction')
-ylabel('count')
-set(gca, 'xtick', 1:4, 'xticklabel', {'smallest' '' '' 'largest'})
-set(gca, 'Fontsize', 14)
-yl = get(gca, 'ylim');
-text(0.75, yl(2) - 250, 'all subjects', 'FontSize', 14)
-hold off
-
-% save the figure
-savefig([output_folder '\AGSICI_cont_counts_position.fig'])
-saveas(fig, [output_folder '\AGSICI_cont_counts_position.png'])
-
-% update figure counter
-figure_counter = figure_counter + 1;
-clear a fig barplot data_visual 
-
-% ----- counts per intensity -----
-col = [0.24 0.49 0.99; 0.72 0.27 1; 0.87 0.16 0.40];
-data_visual = squeeze(sum(case_counter(:, :, :), 2));
-fig = figure(figure_counter);
-hold on
-barplot = bar(data_visual, 'stacked', 'EdgeColor', 'none');
-for a = 1:size(data_visual, 2)
-    barplot(a).FaceColor = col(a, :);
-end
-legend(barplot, {'100 %rMT' '120 %rMT' '140 %rMT'}, 'Location', 'bestoutside', 'fontsize', 14)
-xlabel('muscular contraction')
-ylabel('count')
-set(gca, 'xtick', 1:4, 'xticklabel', {'smallest' '' '' 'largest'})
-set(gca, 'Fontsize', 14)
-hold off
-
-% save the figure
-savefig([output_folder '\AGSICI_cont_counts_intensity.fig'])
-saveas(fig, [output_folder '\AGSICI_cont_counts_intensity.png'])
-
-% update figure counter
-figure_counter = figure_counter + 1;
-clear col a fig barplot data_visual 
-
-%% 14) muscle contraction: stratification per intensity, all subjects included
-
-%% 15) muscle contraction: distribution across conditions, without outliers
-% ----- adjustable parameters -----
-outliers = [5 12];
-% ----- adjustable parameters -----
-% calculate subject index
-index = subject ~= outliers(1) & subject ~= outliers(2);
-
-% calculate mean values to plot
-for i = 1:length(intensity)
-    for p = 1:length(position)
-        for c = 1:length(current)
-            data_visual(i, (p-1)*2 + c) = mean(AGSICI_muscle_activity.contraction.GFP_AUC(p, c, i, index));
-        end
-    end
-end
-clear p c i 
-
-% plot average GFP-AUC by condition
-fig = figure(figure_counter)
-hold on
-barplot = bar(data_visual, 'EdgeColor', 'none');
-for a = 1:size(data_visual, 2)
-    barplot(a).FaceColor = colours(a, :);
-end
-legend(barplot, {'along - normal', 'along - reversed', 'across - normal', 'across - reversed'}, ...
-    'Location', 'bestoutside', 'fontsize', 14)
-xlabel('intensity of stimulation (%rMT)')
-ylabel('muscular contraction')
-set(gca, 'xtick', 1:length(intensity), 'xticklabel', {'100' '120' '140'})
-set(gca, 'Fontsize', 14)
-yl = get(gca, 'ylim');
-text(0.75, yl(2) - 250, sprintf('without outliers:\nsubj. %d and %d', outliers(1), outliers(2)), 'FontSize', 14)
-hold off
-
-% save the figure
-savefig([output_folder '\AGSICI_cont_size_all_WO.fig'])
-saveas(fig, [output_folder '\AGSICI_cont_size_all_WO.png'])
-
-% update figure counter
-figure_counter = figure_counter + 1;
-clear yl fig barplot a data_visual 
-
-% average across intensities
-for p = 1:length(position)
-    for c = 1:length(current)
-        data_visual(:, (p-1)*2 + c) = squeeze(mean(AGSICI_muscle_activity.contraction.GFP_AUC(p, c, :, index), 3));
-    end
-end
-clear p c
-
-% plot average RMS - boxplot
-fig = figure(figure_counter); ax = gca;       
-hold on
-boxplot(data_visual, 'color', colours)
-ax.XTickLabel = '';
-label_array = {'along' 'along' 'across' 'across'; 'normal' 'reversed' 'normal' 'reversed'}; 
-for i = 1:length(label_array)
-    text(i, ax.YLim(1), sprintf('%s\n%s', label_array{:, i}), 'FontSize', 14, ...
-        'horizontalalignment', 'center', 'verticalalignment', 'top');    
-end
-ylabel('muscular contraction')
-set(gca, 'Fontsize', 14)
-yl = get(gca, 'ylim');
-text(2, yl(2) - 1000, sprintf('without outliers:\nsubj. %d and %d', outliers(1), outliers(2)), 'FontSize', 14)
-clear i label_array 
-
-% plot the markers
-for b = 1:4
-    scat(b) = scatter(repelem(b, size(data_visual, 1)), data_visual(:, b),...
-        75, colours(b, :), 'filled');
-end
-
-% save the figure
-savefig([output_folder '\AGSICI_cont_size_WO.fig'])
-saveas(fig, [output_folder '\AGSICI_cont_size_WO.png'])
-
-% update figure counter
-figure_counter = figure_counter + 1;
-clear yl fig ax scat b data_visual 
-
-%% 16) muscle contraction: stratification, without outliers
-% ----- adjustable parameters -----
-prefix_m_cont = 'avg avgchan bl icfilt-plus ica visual crop but fft-notchfilt prefilt prea P1'; 
-% ----- adjustable parameters -----
-
-% split data to groups by size of contraction
-data_table = AGSICIcontXN45;
-data_1 = []; data_2 = []; data_3 = []; data_4 = []; 
-case_counter = ones(4, 2, 3);
-for a = 1:height(data_table)
-    % identify dataset
-    orientation = char(data_table.orientation(a));
-    if strcmp(orientation(1:3), 'alo')
-        p = 1; 
-    elseif strcmp(orientation(1:3), 'acr')
-        p = 2;
-    end
-    if strcmp(orientation(end-2:end), 'mal')
-        c = 1;
-    elseif strcmp(orientation(end-2:end), 'sed')
-        c = 2;
-    end
-    for b = 1:length(intensity)
-        if str2double(intensity{b}(end-2:end)) == data_table.intensity(a)
-            i = b;
-        end
-    end    
-    if data_table.subject(a) < 10
-        subj = ['0' num2str(data_table.subject(a))];
-    else
-        subj = num2str(data_table.subject(a));
-    end
-    
-    % fill in counter
-    case_counter(data_table.contractioncategory(a), p, i) =  case_counter(data_table.contractioncategory(a), p, i) + 1;   
-    
-    % load the processed dataset
-    dataset_name = [prefix_m_cont ' ' subj ' ' position{p} ' ' current{c} ' ' intensity{i} '.mat'];
-    load(dataset_name)
-    
-    % append data to the group variable  
-    statement = ['data_' num2str(data_table.contractioncategory(a)) '(end+1, :, 1, 1, 1, :) = squeeze(data(:, 1:32, :, :, :, x_start:x_end));'];
-    eval(statement)
-end
-clear a b c p i orientation 
-
-% modify header
-header.datasize = size(data_1);
-header.xstart = time_window(1);
-header.chanlocs = header.chanlocs(1:32);
-
-% save for letswave
-for d = 1:4
-    statement = ['data = data_' num2str(d) ';'];
-    eval(statement)
-    header.name = ['merged muscle contraction group_' num2str(d) ' WO'];
-    save([header.name '.mat'], 'data')
-    save([header.name '.lw6'], 'header')
-end
-clear d statement data_1 data_2 data_3 data_4
-
-% ----- counts per position -----
-data_visual = squeeze(sum(case_counter(:, :, :), 3));
-fig = figure(figure_counter);
-hold on
-barplot = bar(data_visual, 'stacked', 'EdgeColor', 'none');
-for a = 1:size(data_visual, 2)
-    barplot(a).FaceColor = colours(a, :);
-end
-legend(barplot, {'along' 'across'}, 'Location', 'bestoutside', 'fontsize', 14)
-xlabel('muscular contraction')
-ylabel('count')
-set(gca, 'xtick', 1:4, 'xticklabel', {'smallest' '' '' 'largest'})
-set(gca, 'Fontsize', 14)
-yl = get(gca, 'ylim');
-ylim([yl(1) yl(2) + 10])
-text(1.5, yl(2)+5, 'without outliers', 'FontSize', 14)
-hold off
-
-% save the figure
-savefig([output_folder '\AGSICI_cont_counts_position_WO.fig'])
-saveas(fig, [output_folder '\AGSICI_cont_counts_position_WO.png'])
-
-% update figure counter
-figure_counter = figure_counter + 1;
-clear a fig barplot yl ata_visual 
-
-% ----- counts per intensity -----
-col = [0.24 0.49 0.99; 0.72 0.27 1; 0.87 0.16 0.40];
-data_visual = squeeze(sum(case_counter(:, :, :), 2));
-fig = figure(figure_counter);
-hold on
-barplot = bar(data_visual, 'stacked', 'EdgeColor', 'none');
-for a = 1:size(data_visual, 2)
-    barplot(a).FaceColor = col(a, :);
-end
-legend(barplot, {'100 %rMT' '120 %rMT' '140 %rMT'}, 'Location', 'bestoutside', 'fontsize', 14)
-xlabel('muscular contraction')
-ylabel('count')
-set(gca, 'xtick', 1:4, 'xticklabel', {'smallest' '' '' 'largest'})
-set(gca, 'Fontsize', 14)
-yl = get(gca, 'ylim');
-ylim([yl(1) yl(2) + 10])
-text(1.5, yl(2)+5, 'without outliers', 'FontSize', 14)
-hold off
-
-% save the figure
-savefig([output_folder '\AGSICI_cont_counts_intensity_WO.fig'])
-saveas(fig, [output_folder '\AGSICI_cont_counts_intensity_WO.png'])
-
-% update figure counter
-figure_counter = figure_counter + 1;
-clear col a fig yl barplot data_visual 
-
-%% 17) muscle contraction: stratification per factors, without outliers
-% ----- adjustable parameters -----
-prefix_m_cont = 'avg avgchan bl icfilt-plus ica visual crop but fft-notchfilt prefilt prea P1'; 
-% ----- adjustable parameters -----
-
-% split by intensity
-for i = 1:length(intensity)
-    data_1 = []; data_2 = []; 
-    
-    % subset the table
-    rows = data_table.intensity == str2double(intensity{i}(end-2:end));
-    data_table_int = data_table(rows, :);
-    
-    % re-assign to groups
-    data_table_int.contractioncategory(1:height(data_table_int)/2) = 1;
-    data_table_int.contractioncategory(height(data_table_int)/2+1:end) = 2;
-    
-    % extract the data
-    for a = 1:height(data_table_int)
-        % identify dataset
-        orientation = char(data_table_int.orientation(a));
-        if strcmp(orientation(1:3), 'alo')
-            p = 1; 
-        elseif strcmp(orientation(1:3), 'acr')
-            p = 2;
-        end
-        if strcmp(orientation(end-2:end), 'mal')
-            c = 1;
-        elseif strcmp(orientation(end-2:end), 'sed')
-            c = 2;
-        end 
-        if data_table_int.subject(a) < 10
-            subj = ['0' num2str(data_table_int.subject(a))];
-        else
-            subj = num2str(data_table_int.subject(a));
-        end 
-
-        % load the processed dataset
-        dataset_name = [prefix_m_cont ' ' subj ' ' position{p} ' ' current{c} ' ' intensity{i} '.mat'];
-        load(dataset_name)
-        
-        % append data to the group variable 
-        statement = ['data_' num2str(data_table_int.contractioncategory(a)) '(end+1, :, 1, 1, 1, :) = squeeze(data(:, 1:32, :, :, :, x_start:x_end));'];
-        eval(statement)
-
-    end
-    
-    % save for letswave
-    for d = 1:2
-        statement = ['data = data_' num2str(d) ';'];
-        eval(statement)
-        header.name = ['merged muscle contraction ' intensity{i} ' group_' num2str(d) ' WO'];
-        save([header.name '.mat'], 'data')
-        save([header.name '.lw6'], 'header')
-    end
-    clear d statement data_1 data_2 
-end
-clear a c p i orientation 
-
-% split by orientation
-orientation = {'along-normal' 'along-reversed' 'across-normal' 'across-reversed'};
-for p = 1:length(position)
-    for c = 1:length(current)
-        data_1 = []; data_2 = []; 
-
-        % subset the table
-        rows = data_table.orientation == orientation{(p-1)*2+c};
-        data_table_int = data_table(rows, :);
-
-        % re-assign to groups
-        data_table_int.contractioncategory(1:round(height(data_table_int)/2)) = 1;
-        data_table_int.contractioncategory(round(height(data_table_int)/2)+1:end) = 2;
-
-        % extract the data
-        for a = 1:height(data_table_int)
-            % identify intensity
-            for b = 1:length(intensity)
-                if str2double(intensity{b}(end-2:end)) == data_table_int.intensity(a)
-                    i = b;
-                end
-            end 
-            
-            % identify subject
-            if data_table_int.subject(a) < 10
-                subj = ['0' num2str(data_table_int.subject(a))];
-            else
-                subj = num2str(data_table_int.subject(a));
-            end 
-
-            % load the processed dataset
-            dataset_name = [prefix_m_cont ' ' subj ' ' position{p} ' ' current{c} ' ' intensity{i} '.mat'];
-            load(dataset_name)
-
-            % append data to the group variable 
-            statement = ['data_' num2str(data_table_int.contractioncategory(a)) '(end+1, :, 1, 1, 1, :) = squeeze(data(:, 1:32, :, :, :, x_start:x_end));'];
-            eval(statement)
-
-        end
-
-        % save for letswave
-        for d = 1:2
-            statement = ['data = data_' num2str(d) ';'];
-            eval(statement)
-            header.name = ['merged muscle contraction ' position{p} ' ' current{c} ' group_' num2str(d) ' WO'];
-            save([header.name '.mat'], 'data')
-            save([header.name '.lw6'], 'header')
-        end
-        clear d statement data_1 data_2 
-    end
-end
-clear a b c p i orientation 
 
 %% functions
 function plot_TEP(x, data_visual, interpol_lim, varargin)
