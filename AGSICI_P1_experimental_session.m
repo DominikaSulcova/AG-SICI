@@ -37,7 +37,7 @@ intensity = [100 120 140];
 session_info{7} = cell2num(inputdlg('rMT at the beginning of the sesion:', 'rMT'));
 
 % calculate intensities
-intensity = round(intensity/100 * session_info{5});
+intensity = round(intensity/100 * session_info{7});
 session_info{8} = intensity;
 disp('Stimulation intensities:')
 disp(['100 %rMT --> ' num2str(intensity(1)) ' %MSO'])
