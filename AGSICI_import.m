@@ -10,34 +10,31 @@
 clear all; clc;
 
 % dataset
-block = 1:8;
+block = 1:9;
 prompt = {'Project:' 'Subject:'};
 dlgtitle = 'Subject';
 dims = [1 35];
-definput = {'P1' '00'};
+definput = {'P2' '00'};
 session_info = inputdlg(prompt,dlgtitle,dims,definput);
 clear prompt dlgtitle dims definput
 
-% coil placement
-session_info{3} = questdlg('Coil placement?', 'Experimental condition',...
-    'along', 'across', 'along');
-
 % create a prefix
-prefix = [session_info{1} ' ' session_info{2} ' ' session_info{3}];
+prefix = [session_info{1} ' ' session_info{2}];
 
 % choose the folder with raw data
-path = ['E:\Data\AG-SICI\Raw data'];
-input_folder = uigetdir(path);
+input_folder = uigetdir(pwd, 'Choose folder with raw data');
 
 % specify EEG block subfolders in the imput folder
 prompt = {'Admit following EEG blocks:'};
 dlgtitle = 'EEG blocks';
 dims = [1 35];
-definput = {'[1:8]'};
+definput = {'[1:9]'};
 answer = cell2mat(inputdlg(prompt,dlgtitle,dims,definput));
 eval(['folder = ' answer ';']); 
-clear answer prompt dlgtitle dims definput             
+clear answer prompt dlgtitle dims definput            
 
+% choose the Git folder 
+git_folder = uigetdir(pwd, 'Choose Git folder');
 
 %% import MEGA datasets
 % import the datasets - blocks indicated by folders vector
@@ -49,7 +46,7 @@ for b = 1:length(block)
     dataset_name = [prefix ' b' num2str(block(b))];
     
     % create the first letswave history entry
-    load('EEG_history_import.mat')
+    load([git_folder '\EEG_history_import.mat'])
     EEG_history_import.configuration.parameters.input_folder = input_folder;
     EEG_history_import.configuration.parameters.session_number = folder(b);   
     header.history(1) =  EEG_history_import;

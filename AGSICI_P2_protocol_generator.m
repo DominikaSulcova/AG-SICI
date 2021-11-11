@@ -80,7 +80,7 @@ for p = 1:length(participant)
     filename_stim = ['SICI_stim_order_' participant{p}];
     save([filename_stim '.mat'], 'outcome')
 end
-% clear p n t 
+clear p n t 
 
 %% functions
 function seq = randomize(matrix, max_rep)
