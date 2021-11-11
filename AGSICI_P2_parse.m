@@ -3,10 +3,17 @@
 % 
 % 1) Identifies the order of events for current session
 %       - loads conditions matrix --> 'SICI_stim_order_XX.mat'
+%       ! check that the matlab file is in the working directory
 % 2) Renames events according to stimulation sequence
 %       - loads header for each dataset
 %       - assigns corresponding codes to events, saves back to letswave 
-% 3) Merges epochs according to experimental conditions
+% 3) Splits datasets per event code
+%       - each block is split into 7 datasets per 11 stimuli
+%       - data and header saved back to letswave
+% 4) Merges epochs according to experimental conditions
+%       - loads data from letswave and merges blocks of each condition
+%       together 
+%       --> 'condition P2 XX'
 % 
 % Important: check whether all the files are disponible in the current directory 
 
