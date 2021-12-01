@@ -1350,6 +1350,63 @@ for i = 1:length(intensity)
 end
 clear data_corr data_corr_ranked fig data_model data_model_ranked marker_col temp
 
+%% 10) muscle contraction X N45: correlation per position/intensity - without outliers
+% ----- adjustable parameters -----
+outliers = [5 8 12];
+% ----- adjustable parameters -----
+
+% calculate index to exclude outliers
+index = subject ~= outliers(1) & subject ~= outliers(2) & subject ~= outliers(3);
+
+% plot the correlations
+fig = figure(figure_counter);
+for p = 1:length(position)  
+    for i = 1:length(intensity)
+        % extract data
+        data_corr_m = [];
+        data_corr_N45 = []; 
+        for c = 1:length(current)
+            data_corr_m = [data_corr_m; squeeze(AGSICI_muscle_activity.contraction.GFP_AUC(p, c, i, index))];
+            data_corr_N45 = [data_corr_N45; squeeze(AGSICI_muscle_activity.N45.GFP_AUC(p, c, i, index))];
+        end
+        data_corr = [data_corr_m data_corr_N45];
+        clear data_corr_muscle data_corr_N45
+
+        % choose colours
+        marker_col = [];
+        for a = 1:size(data_corr, 1)
+            marker_col = [marker_col; colours((p-1)*2 + 1, :)];
+        end
+        clear a 
+
+        % clculate correlation coeficient and p
+        [cor_coef, cor_p] = corr(data_corr, 'Type', 'Spearman');
+
+        % rank the data
+        for a = 1:size(data_corr, 2)
+            [temp, data_corr_ranked(:, a)]  = ismember(data_corr(:, a), unique(data_corr(:, a)));
+        end
+        clear a
+
+        % prepare linear model: y ~ 1 + x
+        data_model_ranked = fitlm(data_corr_ranked(:, 1), data_corr_ranked(:, 2), 'VarNames', {'muscular activity' 'N45'});
+
+        % plot data + regression line
+        subplot(length(intensity), length(position), (i-1)*2 + p)
+        hold on
+        plot_corr(data_model_ranked, data_corr_ranked, marker_col, 'Spearman')
+        title(sprintf('%s - %s', position{p}, intensity{i}), 'FontWeight', 'bold', 'FontSize', 14)
+    end
+end
+clear p c data_corr data_corr_ranked fig data_model data_model_ranked marker_col temp
+% 
+% % save the figure       
+% savefig([output_folder '\AGSICI_cont_corr_ranked_' position{p} '-' current{c} '_WO.fig'])
+% saveas(fig, [output_folder '\AGSICI_cont_corr_ranked_' position{p} '-' current{c} '_WO.png'])
+% 
+% % update the counter
+% figure_counter = figure_counter + 1;  
+
 %% functions
 function peak_x = gfp_plot(x, y, time_window, xstep, labeled, varargin)
 % check whether to plot labels (default)
