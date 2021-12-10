@@ -53,7 +53,7 @@ for b = 1:length(block)
         disp([session_info{1} ' ' session_info{2} ' block ' num2str(block(b))])
         disp(['Found fewer than the expected number of events: ' num2str(length(header.events))])
         prompt = {'Use following TMS stimuli:'};
-        dlgtitle = [session_info{1} ' ' session_info{2} ' ' session_info{4} ' block ' num2str(block(b))];
+        dlgtitle = [session_info{1} ' ' session_info{2} ' block ' num2str(block(b))];
         dims = [1 50];
         definput = {'[1:77]'};
         stims2keep = str2num(cell2mat(inputdlg(prompt,dlgtitle,dims,definput)));
@@ -63,7 +63,7 @@ for b = 1:length(block)
         stim_order(1:length(stims2keep), block(b)) = stim_order(stims2keep(1):stims2keep(end), block(b));
         
     elseif length(header.events) > 77
-        disp([session_info{1} ' ' session_info{2} ' ' session_info{4} ' block ' num2str(block(b))])
+        disp([session_info{1} ' ' session_info{2} ' block ' num2str(block(b))])
         disp(['Found more than the expected number of events: ' num2str(length(header.events))])
         continue
     end
