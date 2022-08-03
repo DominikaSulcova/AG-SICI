@@ -1,7 +1,14 @@
-%% AG-SICI: TMS-EVOKED POTENTIALS
+%% AG-SICI: TMS-EVOKED POTENTIALS - time domain analysis
 % Written by Dominika for AG-SICI project (2021)
 % 
-% Colection of scripts to analyse preprocessed TMS-EEG data:
+% Colection of scripts to analyse preprocessed TMS-EEG data.
+%
+% Custom functions are included in the script, letswave
+% functions are being called from the directory (path needs to be added)
+% 
+% Output:
+%   --> figures are saved in a folder 'AG-SICI_P1_figures
+% 
 % 1) load the data
 %       - loads individual averaged data and trims it in a predefined time
 %       window

@@ -1,4 +1,4 @@
-%% AG-SICI: TMS-EVOKED POTENTIALS
+%% AG SICI: TMS-EVOKED POTENTIALS
 % Written by Dominika for AG-SICI project (2021)
 % 
 % preliminary version:

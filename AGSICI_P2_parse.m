@@ -1,4 +1,4 @@
-%% PARSE EVENTS ACCORDING TO EXPERIMENTAL CONDITIONS
+%% AG SICI: PARSE EVENTS ACCORDING TO EXPERIMENTAL CONDITIONS
 % Written by Dominika for AG-SICI project (2021)
 % 
 % 1) Identifies the order of events for current session

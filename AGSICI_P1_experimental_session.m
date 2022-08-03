@@ -1,4 +1,4 @@
-%% EXPERIMENTAL SESSION AG-SICI
+%% AG TEPs: EXPERIMENTAL SESSION
 % Written by Dominika for AG-SICI project (2021)
 % 
 % The script runs along the experimental session

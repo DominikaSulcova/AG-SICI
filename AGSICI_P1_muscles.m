@@ -1,4 +1,4 @@
-%% AG-SICI: MUSCULAR CONTRIBUTION TO TEP COMPONENT N45
+%% AG TEPs: MUSCULAR CONTRIBUTION TO TEP COMPONENT N45
 % Written by Dominika for GABA-AD project (2021)
 % 
 % ----- muscle contraction X N45: visualization -----
