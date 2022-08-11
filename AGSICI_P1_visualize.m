@@ -6,10 +6,77 @@
 % 
 % Output:
 %   --> figures are saved in a folder 'AG-SICI_P1_figures
+%   --> variables are saved in a global MATLAB output file 'AG-SICI_P1.mat'
 % 
-% 1)
+% 1) PREPARE TEP DATA
+%       - load individual data, remove possible outliers
+%       - average across selected channels
+%       - merge per categor & save for letswave
+%       - compute average + SEM 
+%       - load RAGU output
+% 
+% 2) TEP BUTTERFLY + GFP - individual conditions
+%       - colourcoded
+%       - optionally highlight selected channel
+% 
+% 3) GFP PEAKS - per position 
+%       - calculate mean GFP across all intensities
+%       - identify local maxima, extract latencies
+%       - encode into 'AGSICI_TEP_default' structure
+%       - plot GFP + butterfly + peak topographies
+%
+% 4) TANOVA P-VALUE + EV
+%       - extract p-values and % of explained variance from RAGU output
+%           --> for ALL comparisons
+%       - plot, highlight significant intervals
+% 
+% 5) GFP P-VALUE + EV 
+%       - extract p-values and % of explained variance from RAGU output
+%           --> for selected comparison
+%       - plot, highlight significant intervals
+% 
+% 6) GFP BOXPLOT
+%       - compute individual GFP, average across chosen TOI
+%       - plot a boxplot for chosen comparison
+%           --> orientation / interaction
+% 
+% 7) GFP MEAN VALUES
+%       - extract group GFP values from chosen TOI 
+%       - encode to 'AGSICI_GFP_summary_WO' (WO = without outlier)
+% 
+% 8) MUSCLES OUTLIERS
+%       - load unfiltered data
+%       - compute individual GFP values of muscular artifact [3 10]ms
+%       - plot boxplots, identify outliers
+%       - plot boxplots WO
+% 
+% 9) MUSCLES MEAN VALUES - per position
+%       - encode to 'AGSICI_muscles_summary_WO'
+% 
+% 10) MUSCLES LINEPLOT
+%       - compute average muscle GFP + SEM
+%       - plot all conditions in one figure
+% 
+% 11) MUSCLES SORT BY CONTRACTION SIZE - all conditions
+%       - pool all subjects + all conditions 
+%       - sort by GFP of muscular contraction
+%       - split in 4 categories
+%       - extract mean values, encode to 'AGSICI_muscles_summary'
+%       - save corresponding TEP data for letswave
+%           --> for topography extraction
+%       - plot GFP timecourse
+% 
+% 12) MUSCLES ARTIFACT
+%       - average across all subjects and conditions
+%       - save corresponding TEP data for letswave
+%           --> for topography extraction
+%       - plot timecourse
+% 
+% 13) MUSCLES SORT BY CONTRACTION SIZE - all conditions
+%       - without outliers
+%       - same as (11) but separately for across and along datasets
 
-%% params
+%% parameters
 clear all; clc
 
 % ----------- dataset -----------
@@ -52,12 +119,11 @@ switch answer
 end
 clear answer p i
 
-%% prepare data
+%% 1) PREPARE TEP DATA
 % ----- section input -----
-outliers = [4 7 11];
+outliers = [4];
 target = {'CP5' 'P3' 'P5' 'P7'};
 % -------------------------
-% ----- TEPs -----
 % load individual data, filter out outliers
 load(output_file, 'AGSICI_data')
 idx = find(~ismember(1:size(AGSICI_data, 4), outliers));
@@ -86,64 +152,48 @@ end
 data_individual(:, :, :, size(data_individual, 4) + 1, :) = mean(data_individual(:, :, :, channels, :), 4);
 electrodes{end + 1} = 'target';
 
-% % save data per category for letswave
-% load([folder_git '\header_example.mat'])
-% for p = 1:length(position)
-%     for i = 1:length(intensity)
-%         % subset data
-%         for s = 1:size(data_individual, 3)
-%             for e = 1:size(data_individual, 4)
-%                 for t = 1:size(data_individual, 5)
-%                     data(s, e, 1, 1, 1, t) = data_individual(p, i, s, e, t);
-%                 end
-%             end
-%         end
-%         
-%         % decide name
-%         name = sprintf('merged_subj AGSICI %s TEP %s %s', study, position{p}, intensity{i});
-%         
-%         % save for lw
-%         savelw(data, header, name)        
-%     end
-% end
+% save data per category for letswave
+load([folder_git '\header_example.mat'])
+for p = 1:length(position)
+    for i = 1:length(intensity)
+        % subset data
+        for s = 1:size(data_individual, 3)
+            for e = 1:size(data_individual, 4)
+                for t = 1:size(data_individual, 5)
+                    data(s, e, 1, 1, 1, t) = data_individual(p, i, s, e, t);
+                end
+            end
+        end
+        
+        % decide name
+        name = sprintf('merged_subj AGSICI %s TEP %s %s', study, position{p}, intensity{i});
+        
+        % save for lw
+        savelw(data, header, name)        
+    end
+end
 
 % compute average and SEM
 data_mean = squeeze(mean(data_individual, 3));
 data_SEM =  squeeze(std(data_individual, 0, 3)/sqrt(size(data_individual, 3)));
 
-% ----- MS -----
 % load RAGU data
 load(output_file, 'AGSICI_microstates')
 data_MS = AGSICI_microstates;
 clear AGSICI_microstates
 
-% % encode in a default structure
-% AGSICI_TEP_default = struct;
-% AGSICI_TEP_default.peak = {'P25' 'N45' 'N75' 'N100' 'P180'};
-% AGSICI_TEP_default.center = [];
-% AGSICI_TEP_default.span = [];
-% AGSICI_TEP_default.eoi = [];
+% encode in a default structure
+AGSICI_TEP_default = struct;
+AGSICI_TEP_default.peak = {'P25' 'N45' 'N75' 'N100' 'P180'};
+AGSICI_TEP_default.center = [];
+AGSICI_TEP_default.span = [];
+AGSICI_TEP_default.eoi = [];
 
 % append to the outcome MATLAB file
 save(output_file, 'AGSICI_TEP_default', '-append');
-clear labels AG_peaks
+clear labels AG_peaks t e a b c counter AGSICI_muscle_activity outliers idx t e p i s t channels data header name
 
-% ----- MUSCLES -----
-% load individual data, filter out outliers
-load(output_file, 'AGSICI_muscle_activity')
-counter = 1; 
-for a = 1:size(AGSICI_muscle_activity.contraction.data, 1)
-    for b = 1:size(AGSICI_muscle_activity.contraction.data, 2)
-        for c = 1:size(AGSICI_muscle_activity.contraction.data, 3)
-            data_muscles(counter, c, :, :, :) = AGSICI_muscle_activity.contraction.data(a, b, c, idx, :, :);   
-            data_muscles_gfp(counter, c, :, :) = AGSICI_muscle_activity.contraction.GFP(a, b, c, idx, :);
-        end
-        counter = counter + 1;
-    end
-end
-clear t e a b c counter AGSICI_muscle_activity outliers idx t e p i s t channels data header name
-
-%% TEP butterfly plot + GFP all conditions
+%% 2) TEP BUTTERFLY + GFP - individual conditions
 % ----- section input -----
 channel = 'target';
 x_lim = [-50, 300];
@@ -194,7 +244,7 @@ for p = 1:length(position)
 end
 clear p i e fig fig_name data_visual channel x x_lim x_step y_lim channel_n
 
-%% GFP identify peak latencies + plot per position 
+%% 3) GFP PEAKS - per position 
 % ----- section input -----
 labeled = 'off';
 max_peaks = 6;
@@ -279,7 +329,7 @@ for p = 1:length(position)
 end
 clear labeled max_peaks p data gfp fig fig_name h_axis data_topoplot header pos figure_name x x_lim x_step y_lim
 
-%% TANOVA p-value + EV
+%% 4) TANOVA P-VALUE + EV
 % ----- section input -----
 x_lim = [10, 300];
 x_step = 0.5;
@@ -326,7 +376,7 @@ for c = 1:numel(comparison)
 end
 clear comparison c data_visual fig fig_name x x_start x_end x_lim x_step
 
-%% GFP p-value + EV
+%% 5) GFP P-VALUE + EV
 % ----- section input -----
 factor = 'interaction';         % orientation - intensity - interaction
 x_lim = [10, 300];
@@ -379,10 +429,10 @@ figure_counter = figure_counter + 1 ;
 
 clear factor factor_n data_visual fig x_lim x_step x x_start x_end fig fig_name
 
-%% GFP boxplots
+%% 6) GFP BOXPLOT
 % ----- section input -----
 factor = 'interaction';         % orientation - interaction
-toi = [17, 57];
+toi = [31, 55];
 x_step = 0.5;
 y_lim = [0, 4.5];
 % -------------------------
@@ -442,7 +492,7 @@ switch factor
             fig = plot_scatter(figure_counter, data_visual, x_info, y_info, 'colour', colours((i-1) + [1, 4, 7, 10], :));
 
             % name and save figure
-            fig_name = sprintf('GFP_boxplot_%s_%s', factor, intensity{i});
+            fig_name = sprintf('GFP_boxplot_%s_%s_%s', factor, intensity{i}, 'p0.01');
             savefig([folder_figures '\' fig_name '.fig'])
             saveas(fig, [folder_figures '\' fig_name '.svg'], 'svg')
 
@@ -453,11 +503,151 @@ end
 
 clear factor toi x_step y_lim x_start x_end x_info y_info data_visual fig fig_name p s i
 
-%% MUSCLES lineplot
+%% 7) GFP MEAN VALUES
+% ----- section input -----
+toi = [31, 55];
+x_step = 0.5;
+% -------------------------
+% identify TOI limits
+x_start = (toi(1) + 50)/x_step;
+x_end = (toi(2) + 50)/x_step;
+
+% create output structure
+AGSICI_GFP_summary_WO = struct;
+for p = 1:length(position)
+    for i = 1:length(intensity)
+        % calculate individual GFP per condition (exclude target channel)
+        data = [];
+        for s = 1:size(data_individual, 3)            
+            data(s, :) = std(squeeze(data_individual(p, i, s, 1:end-1, :)), 1);  
+        end
+        data = mean(data(:, x_start:x_end), 2);
+
+        % group median
+        statement = ['AGSICI_GFP_summary_WO.' position{p} '_' intensity{i} '.median = median(data);'];
+        eval(statement)
+
+        % group median
+        statement = ['AGSICI_GFP_summary_WO.' position{p} '_' intensity{i} '.mean = mean(data);'];
+        eval(statement)
+
+        % group median
+        statement = ['AGSICI_GFP_summary_WO.' position{p} '_' intensity{i} '.SD = std(data);'];
+        eval(statement)
+
+        % group median
+        statement = ['AGSICI_GFP_summary_WO.' position{p} '_' intensity{i} '.SEM = std(data)/sqrt(length(data));'];
+        eval(statement)
+    end
+end
+
+% append to general matlab file
+save(output_file, 'AGSICI_GFP_summary_WO', '-append');
+clear toi x_step x_start x_end p i s data statement
+
+%% 8) MUSCLES OUTLIERS
+% ----- section input -----
+toi = [3, 10];
+x_step = 0.5;
+% -------------------------
+% load individual data
+load(output_file, 'AGSICI_muscle_activity')
+counter = 1; 
+for a = 1:size(AGSICI_muscle_activity.contraction.data, 1)
+    for b = 1:size(AGSICI_muscle_activity.contraction.data, 2)
+        for c = 1:size(AGSICI_muscle_activity.contraction.data, 3)
+            data_muscles(counter, c, :, :, :) = AGSICI_muscle_activity.contraction.data(a, b, c, :, :, :);   
+            data_muscles_gfp(counter, c, :, :) = AGSICI_muscle_activity.contraction.GFP(a, b, c, :, :);
+        end
+        counter = counter + 1;
+    end
+end
+clear a b c AGSICI_muscle_activity
+
+% identify TOI limits
+x_start = (toi(1) + 50)/x_step;
+x_end = (toi(2) + 50)/x_step;
+
+% average individual gfp across TOI timepoints and all intensities
+for s = 1:size(data_muscles_gfp, 3)
+    for p = 1:size(data_muscles_gfp, 1)
+        data_visual(s, p) = mean(data_muscles_gfp(p, :, s, x_start:x_end), [2, 4]);
+    end
+end
+clear s p
+
+% plot GFP per condition, identify outliers
+[fig, outliers] = plot_box(figure_counter, data_visual, 'colour', colours([3, 6, 9, 12], :));
+outliers = sort(outliers(1, :));
+
+% name and save figure
+fig_name = 'MUSCLES_outliers';
+savefig([folder_figures '\' fig_name '.fig'])
+saveas(fig, [folder_figures '\' fig_name '.svg'], 'svg')
+
+% update the counter
+figure_counter = figure_counter + 1;  
+
+% boxplot without outliers (average across intensities)
+idx = find(~ismember(1:size(data_muscles_gfp, 3), outliers));
+fig = plot_box(figure_counter, data_visual(idx, :), colours([2, 5, 8, 11], :));
+
+% name and save figure
+fig_name = 'MUSCLES_WO';
+savefig([folder_figures '\' fig_name '.fig'])
+saveas(fig, [folder_figures '\' fig_name '.svg'], 'svg')
+
+% update the counter
+figure_counter = figure_counter + 1; 
+
+clear toi x_step counter x_start x_end data_visual fig fig_name idx
+
+%% 9) MUSCLES MEAN VALUES - per position
+% ----- section input -----
+toi = [3, 10];
+x_step = 0.5;
+% -------------------------
+% identify outliers
+idx = find(~ismember(1:size(data_muscles_gfp, 3), outliers));
+
+% identify TOI limits
+x_start = (toi(1) + 50)/x_step;
+x_end = (toi(2) + 50)/x_step;
+
+% create output structure
+for p = 1:length(position)
+    % subset data, average across intensities
+    data = squeeze(mean(data_muscles_gfp(p, :, idx, x_start:x_end), [2, 4]));
+    
+    % group median
+    statement = ['AGSICI_muscles_summary_WO.' position{p} '.median = median(data);'];
+    eval(statement)
+    
+    % group median
+    statement = ['AGSICI_muscles_summary_WO.' position{p} '.mean = mean(data);'];
+    eval(statement)
+    
+    % group median
+    statement = ['AGSICI_muscles_summary_WO.' position{p} '.SD = std(data);'];
+    eval(statement)
+    
+    % group median
+    statement = ['AGSICI_muscles_summary_WO.' position{p} '.SEM = std(data)/sqrt(length(data));'];
+    eval(statement)
+end
+
+% append to general output file
+save(output_file, 'AGSICI_muscles_summary_WO', '-append');
+clear toi x_step idx x_start x_end p data statement
+
+%% 10) MUSCLES LINEPLOT
 % ----- section input -----
 toi = [3 10];
 x_step = 0.5;
 % -------------------------
+% identify outliers
+idx = find(~ismember(1:size(data_muscles_gfp, 3), outliers));
+
 % identify TOI limits
 x_start = (toi(1) + 50)/x_step;
 x_end = (toi(2) + 50)/x_step;
@@ -470,8 +660,8 @@ hold on
 for p = 1:length(position)
     % calculate mean and SEM
     for i = 1:length(intensity)            
-        y(i) = mean(data_muscles_gfp(p, i, :, x_start:x_end), [3, 4]);
-        SEM(i) = std(squeeze(mean(data_muscles_gfp(p, i, :, x_start:x_end), 4))) / sqrt(size(data_muscles_gfp, 3));
+        y(i) = mean(data_muscles_gfp(p, i, idx, x_start:x_end), [3, 4]);
+        SEM(i) = std(squeeze(mean(data_muscles_gfp(p, i, idx, x_start:x_end), 4))) / sqrt(length(idx));
     end
 
     % plot
@@ -493,16 +683,16 @@ ylabel('GFP (\muV \pm SEM)');
 xlim([0.75, length(intensity) + 0.25])
       
 % name and save figure
-fig_name = 'MUSCLES_lineplot_all';
+fig_name = 'MUSCLES_lineplot_all_WO';
 savefig([folder_figures '\' fig_name '.fig'])
 saveas(fig, [folder_figures '\' fig_name '.svg'], 'svg')
 
 % update the counter
 figure_counter = figure_counter + 1;  
 
-clear p i y SEM toi x_step x_start x_end fig perr fig_name
+clear p i y SEM toi x_step x_start x_end fig perr fig_name idx
 
-%% MUSCLES split by contraction size + plot all conditions 
+%% 11) MUSCLES SORT BY CONTRACTION SIZE - all conditions
 % ----- section input -----
 toi = [3 10];
 x_lim = [-5, 30];
@@ -510,6 +700,9 @@ x_step = 0.5;
 y_lim = [-10, 600];
 categories = 4;
 % -------------------------
+% identify outliers
+idx = find(~ismember(1:size(data_muscles_gfp, 3), outliers));
+
 % check for colour scheme
 answer = questdlg('Do you want to choose a new colour scheme?', 'Colour scheme', 'YES', 'NO', 'NO'); 
 switch answer
@@ -617,11 +810,11 @@ for c = 1:categories
     figure_counter = figure_counter + 1;    
 end
 
-% save to general output file
+% append to general output file
 save(output_file, 'AGSICI_muscles_summary', '-append');
 clear toi x_lim y_lim x_step x_start x_end p i s counter categories c a data header name data_visual x y SEM fig fig_name muscles_subset
 
-%% MUSCLES plot artifact timecourse
+%% 12) MUSCLES ARTIFACT
 % ----- section input -----
 channel = 'CP5';
 x_lim = [-5, 30];
@@ -653,7 +846,7 @@ figure_counter = figure_counter + 1;
         
 clear channel interpolation x_lim x_step y_lim data_visual x e channel_n fig fig_name
 
-%% MUSCLES split by contraction size + plot per orientation
+%% 13) MUSCLES SORT BY CONTRACTION SIZE - per position
 % ----- section input -----
 orientation = {'along' 'across'};
 toi = [3 10];
@@ -661,7 +854,6 @@ x_lim = [-5, 30];
 x_step = 0.5;
 y_lim = [-10, 350];
 categories = 4;
-outliers = [4, 7];
 % -------------------------
 % check for colour scheme
 answer = questdlg('Do you want to choose a new colour scheme?', 'Colour scheme', 'YES', 'NO', 'NO'); 
@@ -765,6 +957,8 @@ for o = 1:length(orientation)
         figure_counter = figure_counter + 1;    
     end
 end
+
+% append to the output file
 save(output_file, 'AGSICI_muscles_summary_WO', '-append');
 clear orientation toi x_lim y_lim x_step x_start x_end p i s o counter categories c a data header name ...
     data_visual x y SEM fig fig_name muscles_subset statement
@@ -1348,5 +1542,43 @@ function fig = plot_muscle(figure_counter, x, y, SEM, x_info, y_info, varargin)
     % set other parameters
     set(gca, 'FontSize', 16) 
     set(gca, 'Layer', 'Top')  
+end
+function [fig, varargout] = plot_box(figure_counter, data_visual, colour)
+    % launch the figure
+    fig = figure(figure_counter); 
+    ax = gca;       
+    hold on
+
+    % plot the data
+    boxplot(data_visual, 'color', colour)
+
+    % axis labels
+    ax.XTickLabel = '';
+    label_array = {'along' 'along' 'across' 'across'; 'normal' 'reversed' 'normal' 'reversed'}; 
+    for i = 1:length(label_array)
+        text(i, ax.YLim(1), sprintf('%s\n%s', label_array{:, i}), 'FontSize', 14, ...
+            'horizontalalignment', 'center', 'verticalalignment', 'top');    
+    end
+    ylabel('GFP (\muV)')
+    set(gca, 'Fontsize', 14)
+
+    % plot the markers
+    for b = 1:size(data_visual, 2)
+        scat(b) = scatter(repelem(b, size(data_visual, 1)), data_visual(:, b),...
+            75, colour(b, :), 'filled');
+    end
+
+    % mark outliers
+    h_out = flipud(findobj(gcf,'tag','Outliers'));
+    for h = 1:length(h_out)
+        x_out =  get(h_out(h), 'XData');
+        y_out =  get(h_out(h), 'YData');
+        for i = 1:length(x_out)
+            if ~(isnan(x_out(i)))
+                outliers(h, i) = find(data_visual(:, h) == y_out(i));
+                text(x_out(i) + 0.1, double(y_out(i)), sprintf('%d', outliers(h, i)))
+            end
+        end
+    end
 end
 
