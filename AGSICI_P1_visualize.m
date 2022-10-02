@@ -208,7 +208,7 @@ for p = 1:length(position)
 end
 clear p i
 
-% preapre x axis
+% prepare x axis
 x = x_lim(1):x_step:x_lim(2);
 
 % identify channel to highlight
