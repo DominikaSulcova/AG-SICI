@@ -65,7 +65,11 @@ clear all; clc
 
 % ----------- dataset -----------
 study = 'P2';
+<<<<<<< HEAD:AGSICI_P2_preprocess.m
 subject = [1:18];
+=======
+subject = [15];
+>>>>>>> main:AGSICI_P2_process.m
 block = 1:9;
 protocol = {'spTMS', 'ppTMS'};
 intensity = {'CS1', 'CS2', 'CS3'};
@@ -98,6 +102,11 @@ output_file = [folder_results '\AG-SICI_' study '.mat' ];
 folder_logfiles = uigetdir(pwd, 'Coose the logfile folder');
 
 %% 1) INFO FILE
+% load if available
+if exist(output_file) 
+    load(output_file, 'AGSICI_info');
+end
+
 % loop through datasets
 for s = 1:length(subject)
     % encode subject number
@@ -118,11 +127,7 @@ end
 clear s subj filename rMT EMG_ID statement
 
 % save the output file
-if ~exist(output_file) 
-    save(output_file, 'AGSICI_info');
-else
-    save(output_file, 'AGSICI_info', '-append');
-end
+save(output_file, 'AGSICI_info', '-append');
 
 %% 2) PRE-PROCESSING BLOCK 1
 % ----- section input -----
@@ -296,7 +301,7 @@ prefix = study;
 % ----- section input -----
 % prefix = study;
 suffix = 'prea';
-components = 32;
+components = 31;
 % -------------------------
 % define ICA mode
 if components == length(electrodes)
