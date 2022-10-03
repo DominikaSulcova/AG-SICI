@@ -71,7 +71,7 @@ for b = 1:length(block)
 end
 
 %% functions
-function [out_header,out_data]=EEG_import_MEGA(input_folder,session_number);
+function [out_header,out_data] = EEG_import_MEGA(input_folder,session_number);
 % Author : Andre Mouraux
 % Institute of Neurosciences (IONS)
 % Universite catholique de louvain (UCL)
