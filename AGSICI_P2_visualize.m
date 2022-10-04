@@ -25,20 +25,22 @@
 %       - plot GFP, identify peak latencies, add topoplots
 %       - plot GFP alone --> for pub figure
 % 
-% 4) IDENTIFY EOIs
+% 4) INDIVIDUAL + GROUP GFP
+% 
+% 5) IDENTIFY EOIs
 %       - 3 eois with the highest voltage based on MS class maps 
 %       --> EOI labels saved to structure 'AGSICI_TEP_default' and added
 %       to the global MATLAB output file
 % 
-% 5) EXTRACT TEP AMPLITUDE 
+% 6) EXTRACT TEP AMPLITUDE 
 % 
-% 6) SAVE FOR R
+% 7) SAVE FOR R
 % 
-% 7) PLOT ABSOLUTE PEAK VALUES - boxplot
+% 8) PLOT ABSOLUTE PEAK VALUES - boxplot
 % 
-% 8) PLOT AMPLITUDE CHANGE - boxplot
+% 9) PLOT AMPLITUDE CHANGE - boxplot
 % 
-% 9) PLOT SICI TIMECOURSE 
+% 10) PLOT SICI TIMECOURSE 
 % 
 
 
@@ -268,7 +270,96 @@ figure_counter = figure_counter + 1;
 
 clear labeled max_peaks data gfp h_axis fig figure_name pos
 
-%% 4) IDENTIFY EOIs
+%% 4) INDIVIDUAL + GROUP GFP
+% ----- section input -----
+y_lim = [0 1.9];
+peaks = {'P25' 'N75'};
+TOI = [15 40; 55 80];
+%-------------------------
+% calculate GFP for each subject
+for c = 1:size(data_individual, 1)
+    for s = 1:size(data_individual, 2)
+        data_GFP_individual(c, s, :) = std(squeeze(data_individual(c, s, 1:32, :)), 1);
+    end
+end
+
+% calculate GFP for each condition
+for c = 1:size(data_individual, 1)
+    data_GFP(c, :) = std(squeeze(mean(data_individual(c, :, 1:32, :), 2)), 1);
+end
+
+% extract mean GFP from TOIs 
+for c = 1:length(condition)
+     for s = 1:size(data_individual, 2)
+         for t = 1:size(TOI, 1)
+             % calculate TOI limits
+             lim = (TOI(t, :) - time_window(1)*1000)/(x_step*1000);
+             
+             % extract mean GFP
+             AGSICI_GFP(c, s, t) = mean(data_GFP_individual(c, s, lim(1):lim(2)));
+         end
+     end
+end
+
+% plot boxplot per TOI and single-pulse condition
+for t = 1:size(TOI, 1)    
+    % plot GFP
+    fig = plot_box(squeeze(AGSICI_GFP([2, 3, 4, 1], :, t))', 'GFP', condition([2, 3, 4, 1]), colours([2, 3, 4, 1], :), figure_counter)
+    hold off
+
+    % name and save figure
+    figure_name = sprintf('AGSICI_TEP_GFP_%s', peaks{t});
+    savefig([folder_figures '\' figure_name '.fig'])
+    saveas(fig, [folder_figures '\' figure_name '.svg'], 'svg')   
+
+    % update figure counter
+    figure_counter = figure_counter + 1;
+end
+
+% plot GFP per condition
+colours_all = colours([1, 2, 3, 4, 2, 3, 4], :);
+for c = 1:length(condition)
+    % plot GFP
+    fig = plot_GFP(figure_counter, x*1000, data_GFP(c, :), y_lim, 'colour', colours_all(c, :));
+
+    % name & save
+    figure_name = sprintf('AGSICI_TEP_GFP_%s', condition{c});
+    savefig([folder_figures '\' figure_name '.fig'])
+    saveas(fig, [folder_figures '\' figure_name '.svg'], 'svg')
+    figure_counter = figure_counter + 1;
+end
+
+% plot TOI topoplots per condition
+cmap = blue2red(48);
+for c = 1:length(condition)
+    for t = 1:size(TOI, 1)
+        % calculate TOI limits
+        lim = (TOI(t, :) - time_window(1)*1000)/(x_step*1000);
+
+        % subset the data
+        data_topoplot = double(squeeze(mean(data_individual(c, :, 1:32, lim(1):lim(2)), [2, 4])));
+        chanlocs = header.chanlocs;
+
+        % plot GFP
+        fig = figure(figure_counter);
+        topoplot(data_topoplot, chanlocs, 'maplimits', [-1 1], 'shading', 'interp', 'whitebk', 'on',...
+            'colormap', cmap, 'style', 'map', 'electrodes', 'off')
+        set(gcf,'color',[1 1 1]);
+
+        % name & save
+        figure_name = sprintf('AGSICI_TEP_%s_%s', peaks{t}, condition{c});
+        savefig([folder_figures '\' figure_name '.fig'])
+        saveas(fig, [folder_figures '\' figure_name '.svg'], 'svg')
+        figure_counter = figure_counter + 1;
+    end
+end
+
+% append to the outcome MATLAB file
+save(output_file, 'data_GFP_individual', 'data_GFP', 'AGSICI_GFP', '-append');
+
+clear c s t fig y_lim colours_all figure_name TOI lim peaks cmap data_topoplot chanlocs
+
+%% 5) IDENTIFY EOIs
 % launch the default structure
 eoi_n = [3,3,3,3,1];
 AGSICI_TEP_default = struct;
@@ -296,7 +387,7 @@ clear k eoi_val eoi_i eoi_n
 % save to the global MATLAB file
 save(output_file, 'AGSICI_TEP_default', '-append');
 
-%% 5) EXTRACT TEP AMPLITUDE
+%% 6) EXTRACT TEP AMPLITUDE
 % ----- section input -----
 percent = 20;                           % % of timepoints included in the mean amplitude calculation
 map_lims = [-4 4];                      % y limits for topoplots 
@@ -556,7 +647,7 @@ save(output_file, 'AGSICI_TEP', '-append');
 clear s k e c a idx figure_title data_visual data_topoplot fig fig_1 yl center span y_mean y_max lat_peak ...
     col_fig1 col_fig pos finish axis_counter topoplot_titles eoi yl_sgtitle figure_name percent polarity map_lims
 
-%% 6) SAVE FOR R
+%% 7) SAVE FOR R
 % identify subjects
 idx = find(~ismember(subject, outliers));
 
@@ -583,7 +674,7 @@ writetable(AGSICI_TEP_values, [folder_results '\AGSICI_' study '_TEP.csv'])
 
 clear c s k idx row_counter
 
-%% 7) PLOT ABSOLUTE PEAK VALUES - boxplot
+%% 8) PLOT ABSOLUTE PEAK VALUES - boxplot
 % ----- section input -----
 peaks2plot = 1:5;
 comparison = 'paired';
@@ -626,7 +717,7 @@ for k = peaks2plot
 end
 clear k c fig figure_name data_amplitude data_latency comparison peaks2plot comp_conditions col
 
-%% 8) PLOT AMPLITUDE CHANGE - boxplot
+%% 9) PLOT AMPLITUDE CHANGE - boxplot
 % ----- section input -----
 peaks2plot = 1:5;
 % -------------------------
@@ -664,7 +755,7 @@ for k = peaks2plot
 end
 clear k c fig figure_name data_amplitude peaks2plot
 
-%% 9) PLOT SICI TIMECOURSE 
+%% 10) PLOT SICI TIMECOURSE 
 % ----- section input -----
 channel = {'Pz'}; 
 y_lim = [-1.9 1.9];
@@ -918,8 +1009,9 @@ function peak_x = GFP_peaks(y, time_window, xstep, labeled, varargin)
     xlabel('time (ms)')
     ylabel('GFP (\muV)')
 end
-function topo_plot(header, data, x_pos, x_start, map_lims)
-    varargin = {'maplimits' map_lims 'shading' 'interp' 'whitebk' 'on'};
+function topo_plot(header, data, x_pos, x_start, map_lims, cmap)
+    % define varargins    
+    varargin = {'maplimits' map_lims 'shading' 'interp' 'whitebk' 'on' 'colormap' cmap};
 
     % fetch data to display
     x_visual = ceil((x_pos - x_start)/header.xstep);
@@ -1074,6 +1166,8 @@ function fig = plot_box(data, datatype, condition, col, figure_counter)
     % y label
     if strcmp(datatype, 'amplitude')
         ylabel('amplitude (\muV)')
+    elseif strcmp(datatype, 'GFP')
+        ylabel('GFP (\muV)')
     elseif strcmp(datatype, 'SICI')
         ylabel('change in amplitude (\muV)')
     elseif strcmp(datatype, 'latency')
@@ -1307,4 +1401,24 @@ end
 
 % unsort so that output matches the original y data
 x(sid)=x;
+end
+function cmap = blue2red(m)
+    if (mod(m,2) == 0)
+        % From [0 0 1] to [1 1 1], then [1 1 1] to [1 0 0];
+        m1 = m*0.5;
+        r = (0:m1-1)'/max(m1-1,1);
+        g = r;
+        r = [r; ones(m1,1)];
+        g = [g; flipud(g)];
+        b = flipud(r);
+    else
+        % From [0 0 1] to [1 1 1] to [1 0 0];
+        m1 = floor(m*0.5);
+        r = (0:m1-1)'/max(m1,1);
+        g = r;
+        r = [r; ones(m1+1,1)];
+        g = [g; 1; flipud(g)];
+        b = flipud(r);
+    end
+    cmap = [r g b]; 
 end
