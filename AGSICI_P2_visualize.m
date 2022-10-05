@@ -23,25 +23,54 @@
 % 3) GFP - all conditions
 %       - average all conditions, compute GFP
 %       - plot GFP, identify peak latencies, add topoplots
-%       - plot GFP alone --> for pub figure
+%       - plot GFP alone --> for MS figure
 % 
-% 4) INDIVIDUAL + GROUP GFP
+% 4) GFP - single pulse TEPs
+%       - calculate individual GFP
+%       - extract mean GFP over predefined TOIs (P25 + N75)
+%       - plot boxplot per TOI 
+%       - plot mean topography per TOI
 % 
-% 5) IDENTIFY EOIs
+% 5) EXTRACT GFP AMPLITUDE - single pulse TEPs
+%       - extract peak/mean amplitude and latency from individual GFPs
+%       --> 'AGSICI_TEP_GFP'
+%       - plot boxplot per GFP peak
+% 
+% 6) IDENTIFY EOIs
 %       - 3 eois with the highest voltage based on MS class maps 
-%       --> EOI labels saved to structure 'AGSICI_TEP_default' and added
-%       to the global MATLAB output file
+%       --> 'AGSICI_TEP_default'
 % 
-% 6) EXTRACT TEP AMPLITUDE 
-% 
-% 7) SAVE FOR R
+% 7) EXTRACT TEP AMPLITUDE 
+%       - extract peak/mean amplitude and latency from individual TEPs
+%       based on identified EOIs and timing from the grand average GFP
+%       --> 'AGSICI_TEP'
+%       - saves values for R
+%       --> 'AGSICI_TEP_values'
 % 
 % 8) PLOT ABSOLUTE PEAK VALUES - boxplot
+%       - user can choose to plot different comparisons, either only
+%       single pulse TEPs ('single'), or TS + paired pulse TEPs ('paired')
+%       - plot for each peak
 % 
 % 9) PLOT AMPLITUDE CHANGE - boxplot
+%       - calculate SICI as difference between paired pulse TEP amd TS
+%       TEP amplitude
+%       - plot for each peak
 % 
 % 10) PLOT SICI TIMECOURSE 
+%       - calculate SICI as point-by-point subtraction of TS TEPs from
+%       paired pulse TEPs
+%       - plot butterfly plots per paired pulse condition
+%       - plot GFP per paired pulse condition
+%       - plot GFP + SEM from a chosen channel 
 % 
+% 11) EXTRACT SICI GFP AMPLITUDE
+%       - extract peak/mean amplitude and latency from individual SICI GFPs
+%       --> 'AGSICI_SICI_GFP'
+% 
+% 12) PLOT SICI GFP 
+%       - plot peak topoplots based on individual GFP latency
+%       - plot boxplots per GFP peak
 
 
 %% parameters
@@ -59,9 +88,9 @@ time_window = [-0.05, 0.3];
 
 % define conditions
 condition{1} = [protocol{1} ' TS'];
-for s = 1:length(protocol)
+for p = 1:length(protocol)
     for i = 1:length(intensity)
-        condition{(s-1)*length(intensity) + i + 1} = [protocol{s} ' ' intensity{i}];
+        condition{(p-1)*length(intensity) + i + 1} = [protocol{p} ' ' intensity{i}];
     end
 end
 clear p i
@@ -178,7 +207,7 @@ data_mean = squeeze(mean(data_individual, 2));
 data_SEM =  squeeze(std(data_individual, 0, 2)/sqrt(size(data_individual, 2)));
 
 % append to the outcome MATLAB file
-save(output_file, 'data_MS', 'data_individual', '-append');
+save(output_file, 'data_MS', 'data_individual', 'data_mean', 'data_SEM', '-append');
 clear target 
 
 %% 2) TEP BUTTERFLY - individual conditions
@@ -270,7 +299,7 @@ figure_counter = figure_counter + 1;
 
 clear labeled max_peaks data gfp h_axis fig figure_name pos
 
-%% 4) INDIVIDUAL + GROUP GFP
+%% 4) GFP - single pulse TEPs
 % ----- section input -----
 y_lim = [0 1.9];
 peaks = {'P25' 'N75'};
@@ -359,7 +388,278 @@ save(output_file, 'data_GFP_individual', 'data_GFP', 'AGSICI_GFP', '-append');
 
 clear c s t fig y_lim colours_all figure_name TOI lim peaks cmap data_topoplot chanlocs
 
-%% 5) IDENTIFY EOIs
+%% 5) EXTRACT GFP AMPLITUDE - single pulse TEPs
+% ----- section input -----
+GFP_peak = {'P25' 'N75'};
+TOI = [15 40; 55 80];
+percent = 20;                           % % of timepoints included in the mean amplitude calculation
+map_lims = [-4 4];                      % y limits for topoplots 
+%-------------------------
+% calculate extraction parameters
+for k = 1:length(GFP_peak)
+    GFP_span(k) = (TOI(k, 2) - TOI(k, 1) + 1)/1000;
+    GFP_center(k) = TOI(k, 1)/1000 + GFP_span(k)/2;
+end
+
+% visualization style
+col_fig = [0.9294    0.1412    0.1412; 0.7176    0.2745    1.0000];
+cmap = blue2red(120);
+
+% loop through subjects
+for s = 1:size(data_individual, 2)
+    % setup names   
+    idx = find(~ismember(subject, outliers));
+    figure_title = sprintf('Subject n. %d', idx(s));    
+       
+    % launch summary figure 
+    if figure_counter < 3
+        figure_counter = 3;
+    end
+    fig = figure(figure_counter);
+    axis_counter = 1;
+        
+    % adjust figure size
+    set(gcf,'units','normalized','outerposition',[0 0 1 1])
+        
+    % loop through peaks
+    for k = 1:length(GFP_peak)               
+        % choose data
+        for c = 1:4
+            % data for timeseries visualization
+            data_visual(c, :) = data_GFP_individual(c, s, :); 
+
+            % data for topoplot
+            for e = 1:32
+                data_topoplot(c, e, 1, 1, 1, :) = squeeze(data_individual(c, s, e, :));
+            end
+        end
+                       
+        % define default TOI 
+        center = GFP_center(k);
+        span = GFP_span(k);
+
+        % set manually the final TOI
+        finish = 0;
+        while finish == 0;   
+            % launch the figure
+            fig_1 = figure(1);                    
+
+            % plot the background 
+            subplot(4, 6, 1:18);
+            hold on
+            plot(x, data_visual, 'b:', 'LineWidth', 0.5)
+            yl = ylim; yl = [yl(1) - 0.2, yl(2) + 0.2]; ylim(yl)
+            xlim(time_window)
+            rectangle('Position', [-0.005, yl(1), 0.015, yl(2)-yl(1)], 'FaceColor', [0.9020    0.9020    0.9020], 'EdgeColor', 'none')
+            title(sprintf('%s\n%s', figure_title, AGSICI_TEP_default.peak{k}), 'FontSize', 16)
+            set(gcf,'units','normalized','outerposition',[0 0 1 1])
+
+            % visualize default peak TOI
+            subplot(4, 6, 1:18)
+            hold on
+            rectangle('Position', [center - span/2, yl(1), span, yl(2)-yl(1)], 'FaceColor', [1,0.7608,0.7608], 'EdgeColor', 'none')
+
+            % extract amplitude and latency
+            [y_mean, y_max, lat_peak] = TEP_amplitude(data_visual, center, span, percent, x_step, time_window(1), 1);
+
+            % update the figure            
+            subplot(4, 6, 1:18)
+            hold on
+            for a = 1:size(data_visual, 1)
+                line([lat_peak(a), lat_peak(a)], [0, y_max(a)], 'Color', 'red', 'LineWidth', 1.5)
+            end
+            plot(x, data_visual(1, :), 'Color', [0 0 0], 'LineWidth', 2.5)
+            plot(x, data_visual(2:4, :), 'Color', [0.7 0.7 0.7], 'LineWidth', 2.5)
+            plot(lat_peak, y_max, 'o', 'MarkerFaceColor', 'red', 'MarkerEdgeColor', 'none', 'MarkerSize', 7)
+
+            % add lines and params                    
+            line([0, 0], yl, 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5)
+            line(x, zeros(length(x)), 'LineStyle', ':', 'Color', [0, 0, 0], 'LineWidth', 1)
+            set(gca, 'FontSize', 14)
+            xlabel('time (s)'); ylabel('GFP (\muV)')
+            
+            % add the topoplot  
+            for a = 1:4
+                subplot(4, 6, 18 + a);
+                header.chanlocs = header.chanlocs(1:32);
+                topo_plot(header, data_topoplot(a, :, :, :, :, :), lat_peak(a), time_window(1), map_lims, cmap) 
+            end
+
+            % ask for approval
+            answer = questdlg('Do you want to proceed?', GFP_peak{k},...
+                'Yes, extract outcome values.', 'No, I will adjust TOI manually.', 'Yes, extract outcome values.');
+
+            % switch action
+            switch answer
+                case 'Yes, extract outcome values.'
+                    % close the figure
+                    close(fig_1)
+
+                    % exit the while loop
+                    finish = 1;
+
+                case 'No, I will adjust TOI manually.'
+                    % assign previous center and span
+                    choose_center = center;  
+                    choose_span = 2 * span;  
+
+                    % identify the limits for visualisation of current peak
+                    choose_x1 = ceil((choose_center - choose_span/2 - time_window(1)) / x_step);
+                    choose_x2 = ceil((choose_center + choose_span/2 - time_window(1)) / x_step);
+                    choose_x = (choose_center - choose_span/2) : x_step : (choose_center + choose_span/2);
+
+                    % prepare data and header for visualization
+                    choose_data = data_visual(:, choose_x1 : choose_x2);
+                    choose_header = header;
+                    choose_header.datasize(6) = length(choose_data);  
+                    choose_header.xstart = choose_center - choose_span/2;
+
+                    % check if vector size matches
+                    if size(choose_data, 2) ~= length(choose_x)
+                        diff = size(choose_data, 2) - length(choose_x);
+                        if diff > 0
+                            choose_data = choose_data(:, 1:end - diff);
+                        elseif diff < 0
+                            choose_x = choose_x(1:end + diff);
+                        end
+                    end
+
+                    % launch the choosing figure                 
+                    choose_figure_name = ['Choose manually peak ' AGSICI_TEP_default.peak{k}];
+                    choose_axesHandles = [];
+                    choose_fig = figure(2);   
+                    choose_axesHandles = [choose_axesHandles subplot(4, 4, [5:16])];  
+                    plot(choose_x, choose_data, 'LineWidth', 2, 'Color', [0.0549    0.5216    0.8118])
+                    xlim([(choose_center - choose_span/2), (choose_center + choose_span/2)])
+                    title(choose_figure_name, 'FontSize', 16)
+                    hold on                
+
+                    % plot the line at the center
+                    l = line([choose_center, choose_center], get(gca,'ylim'), 'Color', 'red', 'LineWidth', 2, 'LineStyle', '--'); 
+                    hold on    
+
+                    % plot the central topography 
+                    for a = 1
+                        choose_axesHandles = [choose_axesHandles subplot(4, 4, a)];
+                        topo_plot(header, data_topoplot(a, :, :, :, :, :), choose_center, time_window(1), map_lims, cmap);
+                    end           
+
+                    % choose the peak position
+                    pos_x = get_position(choose_axesHandles);  
+
+                    % update the figure
+                    set (choose_fig, 'WindowButtonMotionFcn', '');
+                    subplot(4, 4, [5:16])
+                    set(l, 'XData', [pos_x, pos_x], 'LineStyle', '-');
+                    for a = 1
+                        subplot(4, 4, a) 
+                        cla(choose_axesHandles(2))
+                        topo_plot(header, data_topoplot(a, :, :, :, :, :), pos_x, time_window(1), map_lims, cmap);
+                    end
+                    hold off
+
+                    % update the central latency
+                    center = pos_x;
+
+                    % close the choosing figure
+                    pause(2)
+                    close(choose_fig)
+
+                    % close the the main figure
+                    close(fig_1)
+                end
+        end
+        clear fig_1 choose_header choose_map_lims choose_span choose_x choose_x1 choose_x2 l a choose_fig pos_x diff...
+            choose_data choose_center choose_axesHandles answer choose_figure_name
+
+        % record outcome variables
+        AGSICI_TEP_GFP.latency(:, s, k) = lat_peak; 
+        AGSICI_TEP_GFP.amplitude_peak(:, s, k) = y_max; 
+        AGSICI_TEP_GFP.amplitude_mean(:, s, k) = y_mean; 
+
+
+        % set up the main figure
+        figure(fig)
+        subplot(length(GFP_peak), 7, [1 2 3] + 7*(axis_counter-1))
+        hold on
+        plot(x, data_visual, ':', 'Color', [0 0.4471 0.7412], 'LineWidth', 0.3)
+        yl = get(gca, 'ylim'); 
+        xlim(time_window);
+        rectangle('Position', [-0.005, yl(1)+0.01, 0.015, yl(2) - yl(1) - 0.02], 'FaceColor', [0.75 0.75 0.75], 'EdgeColor', 'none')                
+        line([0, 0], yl, 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 1.5)
+        line(x, zeros(length(x)), 'LineStyle', ':', 'Color', [0, 0, 0], 'LineWidth', 0.75)
+        text(-0.14, 0, sprintf('%s', GFP_peak{k}), 'Color', col_fig(k, :), 'FontSize', 16, 'FontWeight', 'bold')
+        set(gca, 'Fontsize', 10)
+        ylabel('GFP (\muV)')
+        xlabel('time (s)') 
+
+        % mark peak latencies 
+        for a = 1:size(data_visual, 1)
+            line([lat_peak(a), lat_peak(a)], [0, y_max(a)], 'Color', col_fig(k, :), 'LineWidth', 2)
+            plot(x, data_visual(a, :), 'Color', [0.4 0.4 0.4], 'LineWidth', 0.75)
+            hold on
+        end 
+
+        % add topoplots
+        topoplot_titles = {'120% rMT' '60% rMT' '80% rMT' '100% rMT'};
+        for a = 1:4
+            subplot(length(GFP_peak), 7, 3 + a + 7*(axis_counter-1))
+            topo_plot(header, data_topoplot(a, :, :, :, :, :), lat_peak(a), time_window(1), map_lims, cmap);   
+            if axis_counter == 1
+                 set(get(gca, 'title'), 'string', topoplot_titles{a}, 'FontSize', 14);
+            end
+        end
+            
+        % update axis counter
+        axis_counter = axis_counter + 1;
+    end                                       
+
+    % finalize the summary figure
+    figure(fig)  
+    subplot(length(GFP_peak), 7, [1 2 3])
+    hold on     
+    yl_sgtitle = get(gca, 'ylim');
+    text(-0.14, yl_sgtitle(2)* 1.5, figure_title, 'FontSize', 16, 'FontWeight', 'bold')
+    hold off
+
+    % name and save figure
+    if subject(idx(s)) < 10
+        subj = ['0' num2str(subject(idx(s)))];
+    else
+        subj = num2str(subject(idx(s)));
+    end
+    figure_name = ['AGSICI_' study '_amplitude_' subj];
+    savefig([folder_figures '\TEP-GFP amplitude\' figure_name '.fig'])
+    saveas(fig, [folder_figures '\TEP-GFP amplitude\' figure_name '.png'])
+    close(fig)
+
+    % update the figure counter
+    figure_counter = figure_counter + 1;  
+end   
+    
+% append progressively the output variables to the general MATLAB file
+save(output_file, 'AGSICI_TEP_GFP', '-append');    
+
+% plot boxplot per peak 
+for k = 1:length(GFP_peak)    
+    % plot GFP
+    fig = plot_box(squeeze(AGSICI_TEP_GFP.amplitude_mean([2, 3, 4, 1], :, k))', 'GFP', condition([2, 3, 4, 1]), colours([2, 3, 4, 1], :), figure_counter)
+    hold off
+
+    % name and save figure
+    figure_name = sprintf('AGSICI_TEP_GFP_individualized_%s', GFP_peak{k});
+    savefig([folder_figures '\' figure_name '.fig'])
+    saveas(fig, [folder_figures '\' figure_name '.svg'], 'svg')   
+
+    % update figure counter
+    figure_counter = figure_counter + 1;
+end
+
+clear k s c a e TOI GFP_peaks GFP_span GFP_center percent map_lims idx figure_title fig axis_counter center span ...
+    data_visual data_topoplot fig_1 yl  y_mean y_max lat_peak col_fig1 col_fig pos finish topoplot_titles ...
+    yl_sgtitle figure_name cmap
+
+%% 6) IDENTIFY EOIs 
 % launch the default structure
 eoi_n = [3,3,3,3,1];
 AGSICI_TEP_default = struct;
@@ -387,7 +687,7 @@ clear k eoi_val eoi_i eoi_n
 % save to the global MATLAB file
 save(output_file, 'AGSICI_TEP_default', '-append');
 
-%% 6) EXTRACT TEP AMPLITUDE
+%% 7) EXTRACT TEP AMPLITUDE
 % ----- section input -----
 percent = 20;                           % % of timepoints included in the mean amplitude calculation
 map_lims = [-4 4];                      % y limits for topoplots 
@@ -647,11 +947,8 @@ save(output_file, 'AGSICI_TEP', '-append');
 clear s k e c a idx figure_title data_visual data_topoplot fig fig_1 yl center span y_mean y_max lat_peak ...
     col_fig1 col_fig pos finish axis_counter topoplot_titles eoi yl_sgtitle figure_name percent polarity map_lims
 
-%% 7) SAVE FOR R
-% identify subjects
+% save for R
 idx = find(~ismember(subject, outliers));
-
-% export to a table
 AGSICI_TEP_values = table;
 row_counter = height(AGSICI_TEP_values) + 1;
 for s = 1:size(AGSICI_TEP.amplitude_peak, 2)    
@@ -773,9 +1070,9 @@ for c = 1:3
         end
     end
     
-    % save for lwtswave
-    name = sprintf('merged SICI %s', condition{4 + c});
-    savelw(data, header, name, [])
+%     % save for lwtswave
+%     name = sprintf('merged SICI %s', condition{4 + c});
+%     savelw(data, header, name, [])
 end
 clear c s e i name data
 
@@ -856,7 +1153,349 @@ for e = 1:length(channel)
     saveas(fig, [folder_figures '\' figure_name '.svg'])
     figure_counter = figure_counter + 1 ;
 end
+
+% append the output variables to the general MATLAB file
+save(output_file, 'data_SICI', '-append');
 clear channel c e e_n data_visual SEM_visual fig yl P F figure_name 
+
+%% 11) EXTRACT SICI GFP AMPLITUDE
+% ----- section input -----
+GFP_peak = {'15ms' '50ms' '100ms' '180ms'};
+TOI = [10 24; 35 55; 80 120; 150 200];
+percent = 20;                               
+map_lims = [-1.5 1.5];                   
+%-------------------------
+% calculate extraction parameters
+for k = 1:length(GFP_peak)
+    GFP_span(k) = (TOI(k, 2) - TOI(k, 1) + 1)/1000;
+    GFP_center(k) = TOI(k, 1)/1000 + GFP_span(k)/2;
+end
+
+% visualization style
+col_fig = [0.9294    0.1412    0.1412; 0.7412    0.0667    0.0667; 
+    0.9020    0.1725    0.6588; 0.3647    0.2078    0.9882];
+cmap = blue2red(120);
+
+% loop through subjects
+for s = 1:size(data_individual, 2)
+    % setup names   
+    idx = find(~ismember(subject, outliers));
+    figure_title = sprintf('Subject n. %d', idx(s));    
+       
+    % launch summary figure 
+    if figure_counter < 3
+        figure_counter = 3;
+    end
+    fig = figure(figure_counter);
+    axis_counter = 1;
+        
+    % adjust figure size
+    set(gcf,'units','normalized','outerposition',[0 0 1 1])
+        
+    % loop through peaks
+    for k = 1:length(GFP_peak)               
+        % choose data
+        for c = 1:3
+            % data for timeseries visualization
+            data_visual(c, :) = std(squeeze(data_SICI(c, s, :, :)), 1);
+
+            % data for topoplot
+            for e = 1:32
+                data_topoplot(c, e, 1, 1, 1, :) = squeeze(data_SICI(c, s, e, :));
+            end
+        end
+                       
+        % define default TOI 
+        center = GFP_center(k);
+        span = GFP_span(k);
+
+        % set manually the final TOI
+        finish = 0;
+        while finish == 0;   
+            % launch the figure
+            fig_1 = figure(1);                    
+
+            % plot the background 
+            subplot(4, 6, 1:18);
+            hold on
+            plot(x, data_visual, 'b:', 'LineWidth', 0.5)
+            yl = ylim; yl = [yl(1) - 0.2, yl(2) + 0.2]; ylim(yl)
+            xlim(time_window)
+            rectangle('Position', [-0.005, yl(1), 0.015, yl(2)-yl(1)], 'FaceColor', [0.9020    0.9020    0.9020], 'EdgeColor', 'none')
+            title(sprintf('%s\n%s', figure_title, GFP_peak{k}), 'FontSize', 16)
+            set(gcf,'units','normalized','outerposition',[0 0 1 1])
+
+            % visualize default peak TOI
+            subplot(4, 6, 1:18)
+            hold on
+            rectangle('Position', [center - span/2, yl(1), span, yl(2)-yl(1)], 'FaceColor', [1,0.7608,0.7608], 'EdgeColor', 'none')
+
+            % extract amplitude and latency
+            [y_mean, y_max, lat_peak] = TEP_amplitude(data_visual, center, span, percent, x_step, time_window(1), 1);
+
+            % update the figure            
+            subplot(4, 6, 1:18)
+            hold on
+            for a = 1:size(data_visual, 1)
+                line([lat_peak(a), lat_peak(a)], [0, y_max(a)], 'Color', 'red', 'LineWidth', 1.5)
+            end
+            for c = 1:3
+                plot(x, data_visual(c, :), 'Color', [0.55 0.55 0.55] - (c - 1)*0.2, 'LineWidth', 2.5)
+            end
+            plot(lat_peak, y_max, 'o', 'MarkerFaceColor', 'red', 'MarkerEdgeColor', 'none', 'MarkerSize', 7)
+
+            % add lines and params                    
+            line([0, 0], yl, 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5)
+            line(x, zeros(length(x)), 'LineStyle', ':', 'Color', [0, 0, 0], 'LineWidth', 1)
+            set(gca, 'FontSize', 14)
+            xlabel('time (s)'); ylabel('GFP (\muV)')
+            
+            % add the topoplot  
+            for a = 1:3
+                subplot(4, 6, 18 + a);
+                header.chanlocs = header.chanlocs(1:32);
+                topo_plot(header, data_topoplot(a, :, :, :, :, :), lat_peak(a), time_window(1), map_lims, cmap) 
+            end
+
+            % ask for approval
+            answer = questdlg('Do you want to proceed?', GFP_peak{k},...
+                'Yes, extract outcome values.', 'No, I will adjust TOI manually.', 'Yes, extract outcome values.');
+
+            % switch action
+            switch answer
+                case 'Yes, extract outcome values.'
+                    % close the figure
+                    close(fig_1)
+
+                    % exit the while loop
+                    finish = 1;
+
+                case 'No, I will adjust TOI manually.'
+                    % assign previous center and span
+                    choose_center = center;  
+                    choose_span = 2 * span;  
+
+                    % identify the limits for visualisation of current peak
+                    choose_x1 = ceil((choose_center - choose_span/2 - time_window(1)) / x_step);
+                    choose_x2 = ceil((choose_center + choose_span/2 - time_window(1)) / x_step);
+                    choose_x = (choose_center - choose_span/2) : x_step : (choose_center + choose_span/2);
+
+                    % prepare data and header for visualization
+                    choose_data = data_visual(:, choose_x1 : choose_x2);
+                    choose_header = header;
+                    choose_header.datasize(6) = length(choose_data);  
+                    choose_header.xstart = choose_center - choose_span/2;
+
+                    % check if vector size matches
+                    if size(choose_data, 2) ~= length(choose_x)
+                        diff = size(choose_data, 2) - length(choose_x);
+                        if diff > 0
+                            choose_data = choose_data(:, 1:end - diff);
+                        elseif diff < 0
+                            choose_x = choose_x(1:end + diff);
+                        end
+                    end
+
+                    % launch the choosing figure                 
+                    choose_figure_name = ['Choose manually peak ' GFP_peak{k}];
+                    choose_axesHandles = [];
+                    choose_fig = figure(2);   
+                    choose_axesHandles = [choose_axesHandles subplot(4, 4, [5:16])];  
+                    plot(choose_x, choose_data, 'LineWidth', 2, 'Color', [0.0549    0.5216    0.8118])
+                    xlim([(choose_center - choose_span/2), (choose_center + choose_span/2)])
+                    title(choose_figure_name, 'FontSize', 16)
+                    hold on                
+
+                    % plot the line at the center
+                    l = line([choose_center, choose_center], get(gca,'ylim'), 'Color', 'red', 'LineWidth', 2, 'LineStyle', '--'); 
+                    hold on    
+
+                    % plot the central topography 
+                    for a = 1:3
+                        choose_axesHandles = [choose_axesHandles subplot(4, 4, a)];
+                        topo_plot(header, data_topoplot(a, :, :, :, :, :), choose_center, time_window(1), map_lims, cmap);
+                    end           
+
+                    % choose the peak position
+                    pos_x = get_position(choose_axesHandles);  
+
+                    % update the figure
+                    set (choose_fig, 'WindowButtonMotionFcn', '');
+                    subplot(4, 4, [5:16])
+                    set(l, 'XData', [pos_x, pos_x], 'LineStyle', '-');
+                    for a = 1
+                        subplot(4, 4, a) 
+                        cla(choose_axesHandles(2))
+                        topo_plot(header, data_topoplot(a, :, :, :, :, :), pos_x, time_window(1), map_lims, cmap);
+                    end
+                    hold off
+
+                    % update the central latency
+                    center = pos_x;
+
+                    % close the choosing figure
+                    pause(2)
+                    close(choose_fig)
+
+                    % close the the main figure
+                    close(fig_1)
+                end
+        end
+        clear fig_1 choose_header choose_map_lims choose_span choose_x choose_x1 choose_x2 l a choose_fig pos_x diff...
+            choose_data choose_center choose_axesHandles answer choose_figure_name
+
+        % record outcome variables
+        AGSICI_SICI_GFP.latency(:, s, k) = lat_peak; 
+        AGSICI_SICI_GFP.amplitude_peak(:, s, k) = y_max; 
+        AGSICI_SICI_GFP.amplitude_mean(:, s, k) = y_mean; 
+
+        % set up the main figure
+        figure(fig)
+        subplot(length(GFP_peak), 7, [1 2 3] + 7*(axis_counter-1))
+        hold on
+        plot(x, data_visual, ':', 'Color', [0 0.4471 0.7412], 'LineWidth', 0.3)
+        yl = get(gca, 'ylim'); 
+        xlim(time_window);
+        rectangle('Position', [-0.005, yl(1)+0.01, 0.015, yl(2) - yl(1) - 0.02], 'FaceColor', [0.75 0.75 0.75], 'EdgeColor', 'none')                
+        line([0, 0], yl, 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 1.5)
+        line(x, zeros(length(x)), 'LineStyle', ':', 'Color', [0, 0, 0], 'LineWidth', 0.75)
+        text(-0.14, 0, sprintf('%s', GFP_peak{k}), 'Color', col_fig(k, :), 'FontSize', 16, 'FontWeight', 'bold')
+        set(gca, 'Fontsize', 10)
+        ylabel('GFP (\muV)')
+        xlabel('time (s)') 
+
+        % mark peak latencies 
+        for a = 1:size(data_visual, 1)
+            line([lat_peak(a), lat_peak(a)], [0, y_max(a)], 'Color', col_fig(k, :), 'LineWidth', 2)
+            plot(x, data_visual(a, :), 'Color', [0.4 0.4 0.4], 'LineWidth', 0.75)
+            hold on
+        end 
+
+        % add topoplots
+        topoplot_titles = intensity;
+        for a = 1:3
+            subplot(length(GFP_peak), 7, 3 + a + 7*(axis_counter-1))
+            topo_plot(header, data_topoplot(a, :, :, :, :, :), lat_peak(a), time_window(1), map_lims, cmap);   
+            if axis_counter == 1
+                 set(get(gca, 'title'), 'string', topoplot_titles{a}, 'FontSize', 14);
+            end
+        end
+            
+        % update axis counter
+        axis_counter = axis_counter + 1;
+    end                                       
+
+    % finalize the summary figure
+    figure(fig)  
+    subplot(length(GFP_peak), 7, [1 2 3])
+    hold on     
+    yl_sgtitle = get(gca, 'ylim');
+    text(-0.14, yl_sgtitle(2)* 1.5, figure_title, 'FontSize', 16, 'FontWeight', 'bold')
+    hold off
+
+    % name and save figure
+    if subject(idx(s)) < 10
+        subj = ['0' num2str(subject(idx(s)))];
+    else
+        subj = num2str(subject(idx(s)));
+    end
+    figure_name = ['AGSICI_' study '_amplitude_' subj];
+    savefig([folder_figures '\SICI-GFP amplitude\' figure_name '.fig'])
+    saveas(fig, [folder_figures '\SICI-GFP amplitude\' figure_name '.png'])
+    close(fig)
+
+    % update the figure counter
+    figure_counter = figure_counter + 1;  
+end   
+    
+% append progressively the output variables to the general MATLAB file
+save(output_file, 'AGSICI_SICI_GFP', '-append');  
+
+clear k s c a e TOI GFP_peak GFP_span GFP_center percent map_lims idx figure_title fig axis_counter center span ...
+    data_visual data_topoplot fig_1 yl  y_mean y_max lat_peak col_fig1 col_fig pos finish topoplot_titles ...
+    yl_sgtitle figure_name cmap
+
+%% 12) PLOT SICI GFP 
+% ----- section input -----
+GFP_peak = {'15ms' '50ms' '100ms' '180ms'};
+modify = 'on';
+y_lim_topo = [-1 1]; 
+y_lim_box = [0 3.5];
+%-------------------------
+% modify output structure if needed
+if strcmp(modify, 'on')
+    struct_temp = AGSICI_SICI_GFP;
+    clear AGSICI_SICI_GFP
+    AGSICI_SICI_GFP.latency.data = struct_temp.latency;
+    AGSICI_SICI_GFP.amplitude_peak.data = struct_temp.amplitude_peak;
+    AGSICI_SICI_GFP.amplitude_mean.data = struct_temp.amplitude_mean;
+    clear struct_temp modify
+end
+
+% calculate mean data + plot peak topoplots
+cmap = blue2red(48);
+for c = 1:3
+    for k = 1:length(GFP_peak) 
+        % extract individual values
+        for s = 1:size(data_individual, 2)
+            peak_x(c, k, s) = (AGSICI_SICI_GFP.latency.data(c, s, k) - time_window(1))/x_step;
+            peak_amplitude(c, k, s) = AGSICI_SICI_GFP.amplitude_peak.data(c, s, k);
+            peak_latency(c, k, s) = AGSICI_SICI_GFP.latency.data(c, s, k) * 1000;
+        end
+        
+        % compute mean values
+        AGSICI_SICI_GFP.amplitude_peak.mean(c, k) = mean(peak_amplitude(c, k, :));
+        AGSICI_SICI_GFP.amplitude_peak.SD(c, k) = std(peak_amplitude(c, k, :));
+        AGSICI_SICI_GFP.amplitude_peak.SEM(c, k) = std(peak_amplitude(c, k, :))/sqrt(size(data_individual, 2));
+        AGSICI_SICI_GFP.amplitude_peak.extremes(c, k, :) = [min(peak_amplitude(c, k, :)) max(peak_amplitude(c, k, :))];
+        AGSICI_SICI_GFP.latency.mean(c, k) = mean(peak_latency(c, k, :));
+        AGSICI_SICI_GFP.latency.SD(c, k) = std(peak_latency(c, k, :));
+        AGSICI_SICI_GFP.latency.SEM(c, k) = std(peak_latency(c, k, :))/sqrt(size(data_individual, 2));
+        AGSICI_SICI_GFP.latency.extremes(c, k, :) = [min(peak_latency(c, k, :)) max(peak_latency(c, k, :))];
+        
+        % extract peak topographies normalized by peak GFP
+        data_topoplot = [];
+        for s = 1:size(data_individual, 2)
+            data_topoplot(s, :) = data_SICI(c, s, 1:32, ceil(peak_x(c, k, s)))/peak_amplitude(c, k, s);
+        end
+        
+        % prepare data 
+        data_topoplot = double(mean(data_topoplot, 1));
+        chanlocs = header.chanlocs;
+
+        % plot peak topoplot
+        fig = figure(figure_counter);
+        topoplot(data_topoplot, chanlocs, 'maplimits', y_lim_topo, 'shading', 'interp', 'whitebk', 'on',...
+            'colormap', cmap, 'style', 'map', 'electrodes', 'off')
+        set(gcf,'color',[1 1 1]);
+
+        % name & save
+        figure_name = sprintf('AGSICI_SICI_topo_%s_%s', GFP_peak{k}, intensity{c});
+        savefig([folder_figures '\' figure_name '.fig'])
+        saveas(fig, [folder_figures '\' figure_name '.svg'], 'svg')
+        figure_counter = figure_counter + 1;
+    end
+end
+
+% plot boxplots
+for k = 1:length(GFP_peak)    
+    % plot GFP amplitude
+    fig = plot_box(squeeze(AGSICI_SICI_GFP.amplitude_mean.data(:, :, k))', 'GFP', intensity, colours([2, 3, 4], :), figure_counter)
+    ylim(y_lim_box)
+    hold off
+
+    % name and save figure
+    figure_name = sprintf('AGSICI_SICI_GFP_amplitude_%s', GFP_peak{k});
+    savefig([folder_figures '\' figure_name '.fig'])
+    saveas(fig, [folder_figures '\' figure_name '.svg'], 'svg')   
+
+    % update figure counter
+    figure_counter = figure_counter + 1;
+end
+
+% append the output variables to the general MATLAB file
+save(output_file, 'AGSICI_SICI_GFP', '-append');
+clear GFP_peak c k s peak_x peak_amplitude peak_latency data_topoplot cmap y_lim_topo y_lim_box chanlocs fig figure_name 
 
 %% functions
 function savelw(data, header, name, target)
@@ -1011,7 +1650,7 @@ function peak_x = GFP_peaks(y, time_window, xstep, labeled, varargin)
 end
 function topo_plot(header, data, x_pos, x_start, map_lims, cmap)
     % define varargins    
-    varargin = {'maplimits' map_lims 'shading' 'interp' 'whitebk' 'on' 'colormap' cmap};
+    varargin = {'maplimits' map_lims 'shading' 'interp' 'whitebk' 'on' 'colormap' cmap 'style' 'map' 'electrodes' 'off'};
 
     % fetch data to display
     x_visual = ceil((x_pos - x_start)/header.xstep);
@@ -1163,6 +1802,11 @@ function fig = plot_box(data, datatype, condition, col, figure_counter)
     % boxplot
     boxplot(data, condition, 'colors', col)
 
+    % other parameters
+    xlabel('TMS stimulus')
+    set(gca, 'FontSize', 14) 
+    set(gca, 'layer', 'top');    
+    
     % y label
     if strcmp(datatype, 'amplitude')
         ylabel('amplitude (\muV)')
@@ -1172,12 +1816,8 @@ function fig = plot_box(data, datatype, condition, col, figure_counter)
         ylabel('change in amplitude (\muV)')
     elseif strcmp(datatype, 'latency')
         ylabel('latency (ms)')
+        view([90 -90])
     end
-
-    % other parameters
-    xlabel('TMS stimulus')
-    set(gca, 'FontSize', 14) 
-    set(gca, 'layer', 'top');
 end
 function beeswarm(x,y,varargin)
 % function xbee = beeswarm(x,y)
