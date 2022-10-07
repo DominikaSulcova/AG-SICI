@@ -394,6 +394,7 @@ GFP_peak = {'P25' 'N75'};
 TOI = [15 40; 55 80];
 percent = 20;                           % % of timepoints included in the mean amplitude calculation
 map_lims = [-4 4];                      % y limits for topoplots 
+modify = 'on';
 %-------------------------
 % calculate extraction parameters
 for k = 1:length(GFP_peak)
@@ -653,6 +654,61 @@ for k = 1:length(GFP_peak)
 
     % update figure counter
     figure_counter = figure_counter + 1;
+end
+
+% modify output structure if needed
+if strcmp(modify, 'on')
+    struct_temp = AGSICI_TEP_GFP;
+    clear AGSICI_TEP_GFP
+    AGSICI_TEP_GFP.latency.data = struct_temp.latency;
+    AGSICI_TEP_GFP.amplitude_peak.data = struct_temp.amplitude_peak;
+    AGSICI_TEP_GFP.amplitude_mean.data = struct_temp.amplitude_mean;
+    clear struct_temp modify
+end
+
+% calculate mean data + plot peak topoplots
+cmap = blue2red(48);
+for c = 1:4
+    for k = 1:length(GFP_peak) 
+        % extract individual values
+        for s = 1:size(data_individual, 2)
+            peak_x(c, k, s) = (AGSICI_TEP_GFP.latency.data(c, s, k) - time_window(1))/x_step;
+            peak_amplitude(c, k, s) = AGSICI_TEP_GFP.amplitude_peak.data(c, s, k);
+            peak_latency(c, k, s) = AGSICI_TEP_GFP.latency.data(c, s, k) * 1000;
+        end
+        
+        % compute mean values
+        AGSICI_TEP_GFP.amplitude_peak.mean(c, k) = mean(peak_amplitude(c, k, :));
+        AGSICI_TEP_GFP.amplitude_peak.SD(c, k) = std(peak_amplitude(c, k, :));
+        AGSICI_TEP_GFP.amplitude_peak.SEM(c, k) = std(peak_amplitude(c, k, :))/sqrt(size(data_individual, 2));
+        AGSICI_TEP_GFP.amplitude_peak.extremes(c, k, :) = [min(peak_amplitude(c, k, :)) max(peak_amplitude(c, k, :))];
+        AGSICI_TEP_GFP.latency.mean(c, k) = mean(peak_latency(c, k, :));
+        AGSICI_TEP_GFP.latency.SD(c, k) = std(peak_latency(c, k, :));
+        AGSICI_TEP_GFP.latency.SEM(c, k) = std(peak_latency(c, k, :))/sqrt(size(data_individual, 2));
+        AGSICI_TEP_GFP.latency.extremes(c, k, :) = [min(peak_latency(c, k, :)) max(peak_latency(c, k, :))];
+        
+        % extract peak topographies normalized by peak GFP
+        data_topoplot = [];
+        for s = 1:size(data_individual, 2)
+            data_topoplot(s, :) = data_individual(c, s, 1:32, ceil(peak_x(c, k, s)))/peak_amplitude(c, k, s);
+        end
+        
+        % prepare data 
+        data_topoplot = double(mean(data_topoplot, 1));
+        chanlocs = header.chanlocs;
+
+        % plot peak topoplot
+        fig = figure(figure_counter);
+        topoplot(data_topoplot, chanlocs, 'maplimits', [-1 1], 'shading', 'interp', 'whitebk', 'on',...
+            'colormap', cmap, 'style', 'map', 'electrodes', 'off')
+        set(gcf,'color',[1 1 1]);
+
+        % name & save
+        figure_name = sprintf('AGSICI_TEP_topo_%s_%s', GFP_peak{k}, condition{c});
+        savefig([folder_figures '\' figure_name '.fig'])
+        saveas(fig, [folder_figures '\' figure_name '.svg'], 'svg')
+        figure_counter = figure_counter + 1;
+    end
 end
 
 clear k s c a e TOI GFP_peaks GFP_span GFP_center percent map_lims idx figure_title fig axis_counter center span ...
