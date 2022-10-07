@@ -35,40 +35,43 @@
 %       - extract peak/mean amplitude and latency from individual GFPs
 %       --> 'AGSICI_TEP_GFP'
 %       - plot boxplot per GFP peak
+%       - plot mean topography per GFP peak
 % 
-% 6) IDENTIFY EOIs
+% 6) PLOT GFP & PERFORM RANOVA - single pulse 
+% 
+% 7) IDENTIFY EOIs
 %       - 3 eois with the highest voltage based on MS class maps 
 %       --> 'AGSICI_TEP_default'
 % 
-% 7) EXTRACT TEP AMPLITUDE 
+% 8) EXTRACT TEP AMPLITUDE 
 %       - extract peak/mean amplitude and latency from individual TEPs
 %       based on identified EOIs and timing from the grand average GFP
 %       --> 'AGSICI_TEP'
 %       - saves values for R
 %       --> 'AGSICI_TEP_values'
 % 
-% 8) PLOT ABSOLUTE PEAK VALUES - boxplot
+% 9) PLOT ABSOLUTE PEAK VALUES - boxplot
 %       - user can choose to plot different comparisons, either only
 %       single pulse TEPs ('single'), or TS + paired pulse TEPs ('paired')
 %       - plot for each peak
 % 
-% 9) PLOT AMPLITUDE CHANGE - boxplot
+% 10) PLOT AMPLITUDE CHANGE - boxplot
 %       - calculate SICI as difference between paired pulse TEP amd TS
 %       TEP amplitude
 %       - plot for each peak
 % 
-% 10) PLOT SICI TIMECOURSE 
+% 11) PLOT SICI TIMECOURSE 
 %       - calculate SICI as point-by-point subtraction of TS TEPs from
 %       paired pulse TEPs
 %       - plot butterfly plots per paired pulse condition
 %       - plot GFP per paired pulse condition
 %       - plot GFP + SEM from a chosen channel 
 % 
-% 11) EXTRACT SICI GFP AMPLITUDE
+% 12) EXTRACT SICI GFP AMPLITUDE
 %       - extract peak/mean amplitude and latency from individual SICI GFPs
 %       --> 'AGSICI_SICI_GFP'
 % 
-% 12) PLOT SICI GFP 
+% 13) PLOT SICI GFP 
 %       - plot peak topoplots based on individual GFP latency
 %       - plot boxplots per GFP peak
 
@@ -394,7 +397,6 @@ GFP_peak = {'P25' 'N75'};
 TOI = [15 40; 55 80];
 percent = 20;                           % % of timepoints included in the mean amplitude calculation
 map_lims = [-4 4];                      % y limits for topoplots 
-modify = 'on';
 %-------------------------
 % calculate extraction parameters
 for k = 1:length(GFP_peak)
@@ -638,9 +640,18 @@ for s = 1:size(data_individual, 2)
     figure_counter = figure_counter + 1;  
 end   
     
-% append progressively the output variables to the general MATLAB file
-save(output_file, 'AGSICI_TEP_GFP', '-append');    
+% append to the general MATLAB file
+save(output_file, 'AGSICI_TEP_GFP', '-append');     
 
+clear k s c a e TOI GFP_peaks GFP_span GFP_center percent map_lims idx figure_title fig axis_counter center span ...
+    data_visual data_topoplot fig_1 yl  y_mean y_max lat_peak col_fig1 col_fig pos finish topoplot_titles ...
+    yl_sgtitle figure_name cmap
+
+%% 6) PLOT GFP & PERFORM RANOVA - single-pulse 
+% ----- section input -----
+GFP_peak = {'P25' 'N75'};
+modify = 'on';
+%-------------------------
 % plot boxplot per peak 
 for k = 1:length(GFP_peak)    
     % plot GFP
@@ -711,11 +722,100 @@ for c = 1:4
     end
 end
 
-clear k s c a e TOI GFP_peaks GFP_span GFP_center percent map_lims idx figure_title fig axis_counter center span ...
-    data_visual data_topoplot fig_1 yl  y_mean y_max lat_peak col_fig1 col_fig pos finish topoplot_titles ...
-    yl_sgtitle figure_name cmap
+% run RANOVA for amplitude and latency
+idx = find(~ismember(subject, outliers));
+condition_single = {'spTS' 'spCS1' 'spCS2' 'spCS3'};
+for k = 1:length(GFP_peak)
+    % ----- amplitude ----- 
+    % prepare data table
+    data_table = table; 
+    data_table.subject = idx'; 
+    for c = [2, 3, 4, 1]
+        statement = ['data_table.' condition_single{c} ' = AGSICI_TEP_GFP.amplitude_peak.data(c, :, k)'';'];
+        eval(statement)
+    end
+    
+    % within-subjects design
+    wd = table(condition_single([2, 3, 4, 1])','VariableNames',{'stimulus'});
+    wd.stimulus = categorical(wd.stimulus); 
+    
+    % rm-ANOVA
+    rm = fitrm(data_table, 'spCS1-spTS ~ 1', 'WithinDesign', wd);
+    
+    % check for approx. normal distribution
+    figure(figure_counter)
+    histogram(reshape(data_table{:,2:end},[],1), 10)
+    figure_counter = figure_counter + 1;
+    
+    % check for sphericity
+    rm.mauchly
+    
+    % results table
+    statement = ['ranova_' GFP_peak{k} '_amplitude = ranova(rm, ''WithinModel'', ''stimulus'');'];
+    eval(statement)
+    
+    % extract p
+    if rm.mauchly.pValue > 0.05
+        statement = ['p = ranova_' GFP_peak{k} '_amplitude.pValue(3);'];
+        eval(statement)
+    else
+        statement = ['p = ranova_' GFP_peak{k} '_amplitude.pValueGG(3);'];
+        eval(statement)
+    end
+    
+    % if ssignificant, compute post-hoc paired t-tests
+    if p < 0.05
+        statement = ['posthoc_' GFP_peak{k} '_amplitude  = multcompare(rm,''stimulus'');'];
+        eval(statement)
+    end
+    
+    % ----- latency ----- 
+    % prepare data table
+    data_table = table; 
+    data_table.subject = idx'; 
+    for c = [2, 3, 4, 1]
+        statement = ['data_table.' condition_single{c} ' = AGSICI_TEP_GFP.latency.data(c, :, k)'';'];
+        eval(statement)
+    end
+    
+    % rm-ANOVA
+    rm = fitrm(data_table, 'spCS1-spTS ~ 1', 'WithinDesign', wd);
+    
+    % check for approx. normal distribution
+    figure(figure_counter)
+    histogram(reshape(data_table{:,2:end},[],1), 10)
+    figure_counter = figure_counter + 1;
+    
+    % check for sphericity
+    rm.mauchly
+    
+    % results table
+    statement = ['ranova_' GFP_peak{k} '_latency = ranova(rm, ''WithinModel'', ''stimulus'');'];
+    eval(statement)    
+    
+        % extract p
+    if rm.mauchly.pValue > 0.05
+        statement = ['p = ranova_' GFP_peak{k} '_latency.pValue(3);'];
+        eval(statement)
+    else
+        statement = ['p = ranova_' GFP_peak{k} '_latency.pValueGG(3);'];
+        eval(statement)
+    end
+    
+    % if ssignificant, compute post-hoc paired t-tests
+    if p < 0.05
+        statement = ['posthoc_' GFP_peak{k} '_latency  = multcompare(rm,''stimulus'');'];
+        eval(statement)
+    end
+end
 
-%% 6) IDENTIFY EOIs 
+% append to the general MATLAB file
+save(output_file, 'AGSICI_TEP_GFP', '-append');  
+
+clear c k s fig figure_name GFP_peak cmap peak_x peak_amplitude peak_latency data_topoplot chanlocs ...
+    idx data_table condition_single statement wd rm p
+
+%% 7) IDENTIFY EOIs 
 % launch the default structure
 eoi_n = [3,3,3,3,1];
 AGSICI_TEP_default = struct;
@@ -743,7 +843,7 @@ clear k eoi_val eoi_i eoi_n
 % save to the global MATLAB file
 save(output_file, 'AGSICI_TEP_default', '-append');
 
-%% 7) EXTRACT TEP AMPLITUDE
+%% 8) EXTRACT TEP AMPLITUDE
 % ----- section input -----
 percent = 20;                           % % of timepoints included in the mean amplitude calculation
 map_lims = [-4 4];                      % y limits for topoplots 
@@ -1027,7 +1127,7 @@ writetable(AGSICI_TEP_values, [folder_results '\AGSICI_' study '_TEP.csv'])
 
 clear c s k idx row_counter
 
-%% 8) PLOT ABSOLUTE PEAK VALUES - boxplot
+%% 9) PLOT ABSOLUTE PEAK VALUES - boxplot
 % ----- section input -----
 peaks2plot = 1:5;
 comparison = 'paired';
@@ -1070,7 +1170,7 @@ for k = peaks2plot
 end
 clear k c fig figure_name data_amplitude data_latency comparison peaks2plot comp_conditions col
 
-%% 9) PLOT AMPLITUDE CHANGE - boxplot
+%% 10) PLOT AMPLITUDE CHANGE - boxplot
 % ----- section input -----
 peaks2plot = 1:5;
 % -------------------------
@@ -1108,7 +1208,7 @@ for k = peaks2plot
 end
 clear k c fig figure_name data_amplitude peaks2plot
 
-%% 10) PLOT SICI TIMECOURSE 
+%% 11) PLOT SICI TIMECOURSE 
 % ----- section input -----
 channel = {'Pz'}; 
 y_lim = [-1.9 1.9];
@@ -1214,7 +1314,7 @@ end
 save(output_file, 'data_SICI', '-append');
 clear channel c e e_n data_visual SEM_visual fig yl P F figure_name 
 
-%% 11) EXTRACT SICI GFP AMPLITUDE
+%% 12) EXTRACT SICI GFP AMPLITUDE
 % ----- section input -----
 GFP_peak = {'15ms' '50ms' '100ms' '180ms'};
 TOI = [10 24; 35 55; 80 120; 150 200];
@@ -1471,7 +1571,7 @@ clear k s c a e TOI GFP_peak GFP_span GFP_center percent map_lims idx figure_tit
     data_visual data_topoplot fig_1 yl  y_mean y_max lat_peak col_fig1 col_fig pos finish topoplot_titles ...
     yl_sgtitle figure_name cmap
 
-%% 12) PLOT SICI GFP 
+%% 13) PLOT SICI GFP 
 % ----- section input -----
 GFP_peak = {'15ms' '50ms' '100ms' '180ms'};
 modify = 'on';
