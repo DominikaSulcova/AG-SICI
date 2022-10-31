@@ -44,20 +44,26 @@
 %       - extract group GFP values from chosen TOI 
 %       - encode to 'AGSICI_GFP_summary_WO' (WO = without outlier)
 % 
-% 8) MUSCLES OUTLIERS
+% 8) GFP RADAR PLOT + CHANGE BOXPLOT
+%       - extract group GFP values from chosen TOIs --> split P25 and N45
+%       - plot radar plots per TOI - position on axes, group by intensity
+%       - calculate GFP change between intensities
+%       - plot boxplots per TOI
+% 
+% 9) MUSCLES OUTLIERS
 %       - load unfiltered data
 %       - compute individual GFP values of muscular artifact [3 10]ms
 %       - plot boxplots, identify outliers
 %       - plot boxplots WO
 % 
-% 9) MUSCLES MEAN VALUES - per position
+% 10) MUSCLES MEAN VALUES - per position
 %       - encode to 'AGSICI_muscles_summary_WO'
 % 
-% 10) MUSCLES LINEPLOT
+% 11) MUSCLES LINEPLOT
 %       - compute average muscle GFP + SEM
 %       - plot all conditions in one figure
 % 
-% 11) MUSCLES SORT BY CONTRACTION SIZE - all conditions
+% 12) MUSCLES SORT BY CONTRACTION SIZE - all conditions
 %       - pool all subjects + all conditions 
 %       - sort by GFP of muscular contraction
 %       - split in 4 categories
@@ -66,13 +72,13 @@
 %           --> for topography extraction
 %       - plot GFP timecourse
 % 
-% 12) MUSCLES ARTIFACT
+% 13) MUSCLES ARTIFACT
 %       - average across all subjects and conditions
 %       - save corresponding TEP data for letswave
 %           --> for topography extraction
 %       - plot timecourse
 % 
-% 13) MUSCLES SORT BY CONTRACTION SIZE - all conditions
+% 14) MUSCLES SORT BY CONTRACTION SIZE - all conditions
 %       - without outliers
 %       - same as (11) but separately for across and along datasets
 
@@ -182,15 +188,15 @@ load(output_file, 'AGSICI_microstates')
 data_MS = AGSICI_microstates;
 clear AGSICI_microstates
 
-% encode in a default structure
-AGSICI_TEP_default = struct;
-AGSICI_TEP_default.peak = {'P25' 'N45' 'N75' 'N100' 'P180'};
-AGSICI_TEP_default.center = [];
-AGSICI_TEP_default.span = [];
-AGSICI_TEP_default.eoi = [];
-
-% append to the outcome MATLAB file
-save(output_file, 'AGSICI_TEP_default', '-append');
+% % encode in a default structure
+% AGSICI_TEP_default = struct;
+% AGSICI_TEP_default.peak = {'P25' 'N45' 'N75' 'N100' 'P180'};
+% AGSICI_TEP_default.center = [];
+% AGSICI_TEP_default.span = [];
+% AGSICI_TEP_default.eoi = [];
+% 
+% % append to the outcome MATLAB file
+% save(output_file, 'AGSICI_TEP_default', '-append');
 clear labels AG_peaks t e a b c counter AGSICI_muscle_activity outliers idx t e p i s t channels data header name
 
 %% 2) TEP BUTTERFLY + GFP - individual conditions
@@ -545,7 +551,100 @@ end
 save(output_file, 'AGSICI_GFP_summary_WO', '-append');
 clear toi x_step x_start x_end p i s data statement
 
-%% 8) MUSCLES OUTLIERS
+%% 8) GFP RADAR PLOT + CHANGE BOXPLOT
+% ----- section input -----
+toi = {[17, 30], [30.5, 56.5]};
+x_step = 0.5;
+y_lim_rad = [0.8, 2.3]; 
+y_lim_box = [-1.2, 2.2];
+% -------------------------
+% plot radar plot
+for t = 1:length(toi)
+    % calculate individual GFP (exclude target channel)
+    data = [];
+    for i = 1:length(intensity)          
+        for p = 1:length(position) 
+            for s = 1:size(data_individual, 3)   
+                data(i, p, s, :) = std(squeeze(data_individual(p, i, s, 1:end-1, :)), 1);  
+            end
+        end
+    end
+
+    % average across subjects and toi
+    x_start = (toi{t}(1) + 50)/x_step;
+    x_end = (toi{t}(2) + 50)/x_step;
+    data_visual = mean(data(:, :, :, x_start:x_end), [3, 4]);
+
+    % reorder positions
+    data_visual = data_visual(:, [3, 2, 4, 1]);
+
+    % launch the figure
+    fig = figure(figure_counter);
+    hold on
+
+    % plot the radar plot
+    spider_plot_R2019b(data_visual, 'AxesLabels', position([3, 2, 4, 1]), ...
+        'AxesLimits', [repelem(y_lim_rad(1), size(data_visual, 2)); repelem(y_lim_rad(2), size(data_visual, 2))],...
+        'AxesAngular', 'off')
+
+    % add legend
+    legend('100% rMT', '120% rMT', '140% rMT', 'Location', 'southoutside');
+
+    % name and save figure
+    fig_name = sprintf('GFP_radarplot_%s', AGSICI_TEP_default.peak{t});
+    savefig([folder_figures '\' fig_name '.fig'])
+    saveas(fig, [folder_figures '\' fig_name '.svg'], 'svg')
+
+    % update figure counter
+    figure_counter = figure_counter + 1 ;
+end
+
+% determine info for boxplot
+x_info = ['orientation' position];
+y_info = {'\Delta GFP (\muV)', y_lim_box};
+
+% plot change boxplot
+for t = 1:length(toi)
+    % calculate individual GFP (exclude target channel)
+    data = [];
+    for i = 1:length(intensity)          
+        for p = 1:length(position) 
+            for s = 1:size(data_individual, 3)   
+                data(i, p, s, :) = std(squeeze(data_individual(p, i, s, 1:end-1, :)), 1);  
+            end
+        end
+    end
+    
+    % average across toi
+    x_start = (toi{t}(1) + 50)/x_step;
+    x_end = (toi{t}(2) + 50)/x_step;
+    data = mean(data(:, :, :, x_start:x_end), 4);
+    
+    % for each intensity change
+    for a = 1:length(intensity) - 1
+        % calculate the change 
+        data_visual = [];
+        for p = 1:length(position) 
+            for s = 1:size(data_individual, 3)
+                data_visual(s, p) = data(a+1, p, s) - data(a, p, s); 
+            end
+        end
+        
+        % plot a boxplot
+        fig = plot_scatter(figure_counter, data_visual, x_info, y_info, 'colour', colours, 'zero_line', 'on');
+        
+        % name and save figure
+        fig_name = sprintf('GFP_boxplot_change_%s', AGSICI_TEP_default.peak{t});
+        savefig([folder_figures '\' fig_name '.fig'])
+        saveas(fig, [folder_figures '\' fig_name '.svg'], 'svg')
+
+        % update figure counter
+        figure_counter = figure_counter + 1 ;
+    end
+end
+clear toi x_step y_lim t data data_visual i p s x_start x_end fig a 
+
+%% 9) MUSCLES OUTLIERS
 % ----- section input -----
 toi = [3, 10];
 x_step = 0.5;
@@ -602,7 +701,7 @@ figure_counter = figure_counter + 1;
 
 clear toi x_step counter x_start x_end data_visual fig fig_name idx
 
-%% 9) MUSCLES MEAN VALUES - per position
+%% 10) MUSCLES MEAN VALUES - per position
 % ----- section input -----
 toi = [3, 10];
 x_step = 0.5;
@@ -640,7 +739,7 @@ end
 save(output_file, 'AGSICI_muscles_summary_WO', '-append');
 clear toi x_step idx x_start x_end p data statement
 
-%% 10) MUSCLES LINEPLOT
+%% 11) MUSCLES LINEPLOT
 % ----- section input -----
 toi = [3 10];
 x_step = 0.5;
@@ -692,7 +791,7 @@ figure_counter = figure_counter + 1;
 
 clear p i y SEM toi x_step x_start x_end fig perr fig_name idx
 
-%% 11) MUSCLES SORT BY CONTRACTION SIZE - all conditions
+%% 12) MUSCLES SORT BY CONTRACTION SIZE - all conditions
 % ----- section input -----
 toi = [3 10];
 x_lim = [-5, 30];
@@ -814,7 +913,7 @@ end
 save(output_file, 'AGSICI_muscles_summary', '-append');
 clear toi x_lim y_lim x_step x_start x_end p i s counter categories c a data header name data_visual x y SEM fig fig_name muscles_subset
 
-%% 12) MUSCLES ARTIFACT
+%% 13) MUSCLES ARTIFACT
 % ----- section input -----
 channel = 'CP5';
 x_lim = [-5, 30];
@@ -846,7 +945,7 @@ figure_counter = figure_counter + 1;
         
 clear channel interpolation x_lim x_step y_lim data_visual x e channel_n fig fig_name
 
-%% 13) MUSCLES SORT BY CONTRACTION SIZE - per position
+%% 14) MUSCLES SORT BY CONTRACTION SIZE - per position
 % ----- section input -----
 orientation = {'along' 'across'};
 toi = [3 10];
@@ -1236,6 +1335,14 @@ function fig = plot_scatter(figure_counter, data_visual, x_info, y_info, varargi
                 colour(b, :) = [0.7 0.7 0.7];
             end
         end
+        
+        % line colour
+        c = find(strcmpi(varargin, 'zero_line'));
+        if ~isempty(c)
+            zero_line = varargin{c + 1};
+        else
+            zero_line = 'off';
+        end
     end 
     
     % prepare data
@@ -1256,6 +1363,11 @@ function fig = plot_scatter(figure_counter, data_visual, x_info, y_info, varargi
     % add boxplot
     for a = 1:size(data_visual, 2)
         boxchart(a * ones(size(data_visual, 1), 1), data_visual(:, a), 'BoxFaceColor', colour(a, :))
+    end
+    
+    % add zero line if required
+    if strcmp(zero_line, 'on')
+        line([0.25, size(data_visual, 2) + 0.25], [0, 0], 'Color', [0 0 0], 'LineWidth', 1.5, 'LineStyle', ':')
     end
     
     % font
