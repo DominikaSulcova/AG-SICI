@@ -631,10 +631,10 @@ for t = 1:length(toi)
         end
         
         % plot a boxplot
-        fig = plot_scatter(figure_counter, data_visual, x_info, y_info, 'colour', colours, 'zero_line', 'on');
+        fig = plot_scatter(figure_counter, data_visual, x_info, y_info, 'colour', colours([2, 5, 8, 11], :), 'zero_line', 'on');
         
         % name and save figure
-        fig_name = sprintf('GFP_boxplot_change_%s', AGSICI_TEP_default.peak{t});
+        fig_name = sprintf('GFP_boxplot_change_%s_%s', AGSICI_TEP_default.peak{t}, [num2str(intensity{a+1}) '-' num2str(intensity{a})]);
         savefig([folder_figures '\' fig_name '.fig'])
         saveas(fig, [folder_figures '\' fig_name '.svg'], 'svg')
 
