@@ -65,11 +65,7 @@ clear all; clc
 
 % ----------- dataset -----------
 study = 'P2';
-<<<<<<< HEAD:AGSICI_P2_preprocess.m
-subject = [1:18];
-=======
 subject = [15];
->>>>>>> main:AGSICI_P2_process.m
 block = 1:9;
 protocol = {'spTMS', 'ppTMS'};
 intensity = {'CS1', 'CS2', 'CS3'};
