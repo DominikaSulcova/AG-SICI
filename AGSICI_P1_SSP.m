@@ -1,11 +1,11 @@
 %  processing with SSP-SIR
 
 %% parameters
-clear all; clc;
+% clear all; clc;
 
 % dataset
-subject = 1;
-sequence = {'along' 'across'; 'reversed' 'normal'};
+subject = 3;
+sequence = {'along' 'across'; 'normal' 'reversed'};
 block = 1:8;
 orientation = {'along_normal' 'along_reversed' 'across_normal' 'across_reversed'};
 intensity = {'100' '120' '140'};
@@ -17,6 +17,7 @@ else
    subj = num2str(subject); 
 end
 
+%%
 % choose relevant directories
 folder_toolbox = uigetdir(pwd, 'Choose the toolbox folder');       % letswave + eeglab masterfiles
 folder_output = uigetdir(pwd, 'Choose the output folder');         % processed data
@@ -165,9 +166,9 @@ for s = 1:2
     % identify stimulation order
     switch sequence{2, s}
         case 'normal'
-            index = repmat(['NR'], 1, length(block)/2);
+            index = repmat('NR', 1, length(block)/2);
         case 'reversed'
-            index = repmat(['RN'], 1, length(block)/2);
+            index = repmat('RN', 1, length(block)/2);
     end
     for b = block
         statement = ['stim_order(:, b) = stim_order_' index(b) '(:, b);'];
@@ -395,9 +396,12 @@ for o = 1:length(orientation)
             case 'NO'
                 EEG = EEG_old;
                 clear EEG_old
-        end        
-        [ALLEEG EEG CURRENTSET] = pop_newset(ALLEEG, EEG, counter, 'setname', name, 'overwrite', 'on', 'gui', 'off'); 
+        end    
+
+        % baseline correct and save
+        EEG = pop_rmbase(EEG, baseline, []);
         name = sprintf('%s AGSICI P1 S%s %s %s %s.set', prefix, subj, orientation{o}, intensity{i}, suffix); 
+        [ALLEEG EEG CURRENTSET] = pop_newset(ALLEEG, EEG, counter, 'setname', name, 'overwrite', 'on', 'gui', 'off');
         EEG.filename = name;
         eeglab redraw
 
@@ -440,7 +444,7 @@ for o = 1:length(orientation)
 
         % baseline correct and save
         EEG = pop_rmbase(EEG, baseline, []);
-        name = sprintf('%s AGSICI P1 S%s %s %s %s', prefix, subj, orientation{o}, intensity{i}, suffix); 
+        name = sprintf('%s AGSICI P1 S%s %s %s %s all_filt', prefix, subj, orientation{o}, intensity{i}, suffix); 
         [ALLEEG EEG CURRENTSET] = pop_newset(ALLEEG, EEG, counter, 'setname', name, 'overwrite', 'on', 'gui', 'off'); 
         eeglab redraw
 
@@ -457,7 +461,220 @@ for o = 1:length(orientation)
         counter = counter + 1;
     end
 end
-clear 
+clear suffix time_range baseline o i a counter name other_datasets param
+
+%% export back to letswave
+% ----- section input -----
+suffix = 'sspsir';
+% ------------------------- 
+% add letswave 6 to the top of search path
+addpath(genpath([folder_toolbox '\letswave6-master']));
+
+% export data and header
+counter = 1;
+fprintf('exporting back to letswave: \n')
+for o = 1:length(orientation)
+    fprintf('%s: ', strrep(orientation{o}, '_', ' '))
+    for i = 1:length(intensity)  
+        fprintf('...%s ', intensity{i})
+        % depending on whether EEGLAB is running:
+        if exist('eeglab', 'file') == 2 && length(ALLEEG) >= counter
+            % select the dataset in EEGLAB
+            EEG = ALLEEG(counter);
+            [ALLEEG EEG CURRENTSET] = eeg_store(ALLEEG, EEG, counter);
+            eeglab redraw    
+        
+        else
+            % launch eeglab if necessary
+            if exist('eeglab', 'file') == 0
+                % add eeglab and fastica to the of search path
+                addpath(fullfile(folder_toolbox,'eeglab2022.1'));
+                addpath(fullfile(folder_toolbox,'FastICA_25'));
+                
+                % launch eeglab and generate an empty EEGLAB structure
+                eeglab 
+            end
+            
+            % load the dataset
+            name = sprintf('%s AGSICI P1 S%s %s %s %s.set', prefix, subj, orientation{o}, intensity{i}, suffix); 
+            EEG = pop_loadset('filename', name, 'filepath', folder_output);
+            [ALLEEG EEG CURRENTSET] = eeg_store(ALLEEG, EEG, counter);
+            eeglab redraw              
+        end
+
+        % load the original data
+        [lwdata.header, lwdata.data] = CLW_load(sprintf('%s AGSICI P1 S%s %s %s', prefix, subj, orientation{o}, intensity{i}));
+        
+        % replace the data
+        lwdata.data = [];
+        for t = 1:size(EEG.data, 3)
+            for e = 1:size(EEG.data, 1)
+                for k = 1:size(EEG.data, 2)
+                    lwdata.data(t, e, 1, 1, 1, k) = EEG.data(e, k, t);
+                end
+            end
+        end
+        
+        % modify header
+        lwdata.header.name = sprintf('%s %s AGSICI P1 S%s %s %s', suffix, prefix, subj, orientation{o}, intensity{i});
+        lwdata.header.datasize = size(lwdata.data);
+        lwdata.header.chanlocs = lwdata.header.chanlocs(1:size(lwdata.data, 2));
+        lwdata.header.events = lwdata.header.events(1:size(lwdata.data, 1));
+        
+        % ssp-sir 
+        lwdata.header.SSPSIR = EEG.SSPSIR;   
+        
+        % save 
+        CLW_save([], lwdata.header, lwdata.data);
+
+        % update counter
+        counter = counter + 1;
+    end
+    fprintf('\n')
+end
+fprintf('done.\n')
+sound(soundwave)
+
+% update prefix
+prefix = [suffix  ' ' prefix];
+clear name counter suffix ref o i t e k lwdata option ...
+    ALLCOM ALLEEG CURRENTSET CURRENTSTUDY EEG globalvars LASTCOM PLUGINLIST STUDY
+
+%% preprocessing before ICA
+% ----- section input -----
+suffix = {'bandpass' 'notch' 'crop' 'bl' 'interp2'};
+interp = [-0.005, 0.01];
+bandpass = [0.1 80];
+notch = 50;
+crop = [-0.3 0.5];
+baseline = [-0.25 -0.005];
+% ------------------------- 
+% cycle through datasets
+for o = 1:length(orientation)
+    fprintf('%s - ', strrep(orientation{o}, '_', ' '))
+    for i = 1:length(intensity)
+        fprintf('%s %%rMT:\n', intensity{i}) 
+        % add letswave 7 to the top of search path
+        addpath(genpath([folder_toolbox '\letswave7-master']));
+
+        % load the data
+        filename = sprintf('%s AGSICI P1 S%s %s %s', prefix, subj, orientation{o}, intensity{i});
+        option = struct('filename', filename);
+        lwdata = FLW_load.get_lwdata(option);
+
+        % bandpass
+        fprintf('...applying Butterworth bandpass filter')
+        option = struct('filter_type', 'bandpass', 'high_cutoff', bandpass(2),'low_cutoff', bandpass(1),...
+            'filter_order', 4, 'suffix', suffix{1}, 'is_save', 0);
+        lwdata = FLW_butterworth_filter.get_lwdata(lwdata, option);
+
+        % notch
+        fprintf('...applying FFT %dHz notch filter', notch)
+        option = struct('filter_type', 'notch', 'notch_fre', notch, 'notch_width', 2, 'slope_width', 2,...
+            'harmonic_num', 2, 'suffix', suffix{2},'is_save', 0);
+        lwdata = FLW_FFT_filter.get_lwdata(lwdata, option);
+
+        % crop
+        fprintf('...cropping')
+        option = struct('xcrop_chk', 1, 'xstart', crop(1), 'xend', crop(2), 'suffix', suffix{3}, 'is_save', 0);
+        lwdata = FLW_crop_epochs.get_lwdata(lwdata, option);
+
+        % baseline correction
+        fprintf('...correcting for baseline\n')
+        option = struct('operation','substract', 'xstart', baseline(1), 'xend', baseline(2), 'suffix', suffix{4}, 'is_save', 0);
+        lwdata = FLW_baseline.get_lwdata(lwdata, option);
+
+        % add letswave 6 to the top of search path
+        addpath(genpath([folder_toolbox '\letswave6-master']));
+
+        % interpolation
+        fprintf('...interpolating\n')
+        [header, data, ~] = RLW_suppress_artifact_event(lwdata.header, lwdata.data,...
+            'xstart', interp(1), 'xend',  interp(2), 'interp_method', 'pchip');
+
+        % save
+        header.name = [suffix{5} ' ' header.name];
+        CLW_save([], header, data);
+    end
+end
+fprintf('done.\n')
+sound(soundwave)
+
+% update prefix
+for s = 1:length(suffix)
+    prefix = [suffix{s} ' ' prefix];
+end
+clear suffix interp bandpass notch crop baseline o i s filename option lwdata header data
+
+%% calculate ICA matrix
+% ----- section input -----
+suffix = {'ica' 'sp_filter'};
+% -------------------------
+% add letswave 7 to the top of search path
+addpath(genpath([folder_toolbox '\letswave7-master']));
+
+% calculate ICA matrix separately for each session (along / across)
+for s = 1:size(sequence, 1)
+    fprintf('calculating ICA matrix: orientation %s STS\n', sequence{1, s}) 
+    % identify the files
+    filenames = dir(sprintf('%s AGSICI P1 S%s %s*.mat', prefix, subj, sequence{1, s}));
+    for d = 1:length(filenames) 
+        [~, filename, ~] = fileparts(filenames(d).name);
+        dataset{d} = sprintf('%s\\%s.lw6', folder_output, filename); 
+    end
+
+    % load the dataset
+    option = struct('filename', {dataset});
+    lwdataset = FLW_load.get_lwdataset(option);
+
+    % compute the ICA matrix
+    option = struct('ICA_mode', 3, 'algorithm', 1, 'percentage_PICA', 100, 'criterion_PICA', 'LAP', 'suffix', suffix{1}, 'is_save', 1);
+    lwdataset = FLW_compute_ICA_merged.get_lwdataset(lwdataset, option);
+end
+
+% update prefix
+for s = 1:length(suffix)
+    prefix = [suffix{s} ' ' prefix];
+end
+clear suffix counter s filenames filename d dataset option lwdataset
+
+%% baseline correct and average
+% ----- section input -----
+suffix = {'bl' 'avg'};
+baseline = [-0.25 -0.005];
+% ------------------------- 
+% add letswave 7 to the top of search path
+addpath(genpath([folder_toolbox '\letswave7-master']));
+
+% cycle through datasets
+for o = 1:length(orientation)
+    fprintf('%s - ', strrep(orientation{o}, '_', ' '))
+    for i = 1:length(intensity)
+        fprintf('%s %%rMT:\n', intensity{i}) 
+        % add letswave 7 to the top of search path
+        addpath(genpath([folder_toolbox '\letswave7-master']));
+
+        % load the data
+        filename = sprintf('%s AGSICI P1 S%s %s %s', prefix, subj, orientation{o}, intensity{i});
+        option = struct('filename', filename);
+        lwdata = FLW_load.get_lwdata(option);
+
+        % baseline correction
+        fprintf('...correcting for baseline\n')
+        option = struct('operation','substract', 'xstart', baseline(1), 'xend', baseline(2), 'suffix', suffix{1}, 'is_save', 0);
+        lwdata = FLW_baseline.get_lwdata(lwdata, option);
+
+        % average across epochs & save
+        option = struct('operation', 'average', 'suffix', suffix{2}, 'is_save', 1);
+        lwdata = FLW_average_epochs.get_lwdata(lwdata, option);
+    end
+end
+
+% update prefix
+for s = 1:length(suffix)
+    prefix = [suffix{s} ' ' prefix];
+end
+clear suffix baseline s option lwdata
 
 %% functions
 function export_EEGLAB(lwdata, filename, ref, subj)
