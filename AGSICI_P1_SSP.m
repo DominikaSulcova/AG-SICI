@@ -4,8 +4,8 @@
 % clear all; clc;
 
 % dataset
-subject = 3;
-sequence = {'along' 'across'; 'normal' 'reversed'};
+subject = 4;
+sequence = {'across' 'along';'reversed' 'normal'};
 block = 1:8;
 orientation = {'along_normal' 'along_reversed' 'across_normal' 'across_reversed'};
 intensity = {'100' '120' '140'};
@@ -85,7 +85,7 @@ sound(soundwave)
 % ----- section input -----
 suffix = {'reref' 'dc' 'ep' 'art-sup' 'ds'};
 eventcode = 'B - Stimulation';
-epoch = [-0.2 0.5];
+epoch = [-1 3];
 interp = [-0.003, 0.003];
 ds_ratio = 10;
 % ------------------------- 
@@ -117,7 +117,7 @@ for s = 1:2
         
         % segment 
         fprintf('...epoching')
-        [header, data, ~] = RLW_segmentation(header, data, {{eventcode}}, 'x_start', -1, 'x_duration', 3);
+        [header, data, ~] = RLW_segmentation(header, data, {{eventcode}}, 'x_start', epoch(1), 'x_duration', epoch(2));
         
         % interpolate TMS artifact
         fprintf('...interpolating the TMS artifact')
@@ -214,6 +214,9 @@ for s = 1:2
     end
     fprintf('...done.\n')
 end
+
+% add letswave 7 to the top of search path
+addpath(genpath([folder_toolbox '\letswave7-master']));
 clear folder_input stim_order_N stim_order_R stim_order s index b statement file filename header stims2keep e
 
 %% parse by intensity
@@ -265,8 +268,7 @@ clear o files f filename option lwdata lwdataset data2merge i
 
 %% visual inspection, bad channels removal
 % ----- section input -----
-subject = 1;
-session = 'across'; %'along' 'across'
+session = 'along'; %'along' 'across'
 current = {'normal' 'reversed'};
 prefix = 'visual';
 epoch2remove = {[], ...
@@ -349,12 +351,13 @@ for s = 1:length(subject)
     end
 end
 fprintf('done.\n')
-clear o i file
+
+clear ref o i s name option lwdata
 
 %% SSP-SIR
 % ----- section input -----
 suffix = 'sspsir';
-time_range = [-0.005, 0.05];
+time_range = [-0.005, 0.3];
 baseline = [-0.25 -0.005];
 % ------------------------- 
 % add eeglab and fastica to the of search path
@@ -422,46 +425,57 @@ for o = 1:length(orientation)
     end
 end
 
-% apply ssp-sir filters of other compared datasets
-counter = 1;
-for o = 1:length(orientation)
-    for i = 1:length(intensity)  
-        % select the dataset
-        EEG = ALLEEG(counter);
-        [ALLEEG EEG CURRENTSET] = eeg_store(ALLEEG, EEG, counter);
-        eeglab redraw
-
-        % SSP-SIR 
-        other_datasets = [1:12];
-        other_datasets = other_datasets(strcmp(answer, 'YES'));
-        other_datasets = other_datasets(other_datasets ~= counter);
-        for a = other_datasets
-            [EEG_trials] = SSP_SIR_trials(EEG, param(counter).L_ave, ...
-                param(a).topo, ...
-                param(counter).kernel, []);
-            EEG.data =  EEG_trials.data;
+% close all figures if required
+answer_fig = questdlg('Do you want to close the figures?', 'figures', 'YES', 'NO', 'YES'); 
+if strcmp(answer_fig, 'YES')
+    figures = findall(0, 'Type', 'figure');
+    for f = 1:length(figures)
+        if strcmp(figures(f).Name, ' timtopo()')
+            close(figures(f))
         end
-
-        % baseline correct and save
-        EEG = pop_rmbase(EEG, baseline, []);
-        name = sprintf('%s AGSICI P1 S%s %s %s %s all_filt', prefix, subj, orientation{o}, intensity{i}, suffix); 
-        [ALLEEG EEG CURRENTSET] = pop_newset(ALLEEG, EEG, counter, 'setname', name, 'overwrite', 'on', 'gui', 'off'); 
-        eeglab redraw
-
-        % visual check - after SSP-SIR
-        figure;
-        pop_timtopo(EEG, [-50  100], [5 10  25 45 75]);
-        sgtitle(sprintf('S%s - %s, %s %%rMT - FINAL', subj, strrep(orientation{o}, '_', ' '), intensity{i}))
-
-        % save dataset
-        name = sprintf('%s AGSICI P1 S%s %s %s %s all_filt.set', prefix, subj, orientation{o}, intensity{i}, suffix);  
-        pop_saveset(EEG, 'filename', name, 'filepath', folder_output);
-
-        % update counter
-        counter = counter + 1;
     end
 end
-clear suffix time_range baseline o i a counter name other_datasets param
+
+% % apply ssp-sir filters of other compared datasets
+% counter = 1;
+% for o = 1:length(orientation)
+%     for i = 1:length(intensity)  
+%         % select the dataset
+%         EEG = ALLEEG(counter);
+%         [ALLEEG EEG CURRENTSET] = eeg_store(ALLEEG, EEG, counter);
+%         eeglab redraw
+% 
+%         % SSP-SIR 
+%         other_datasets = [1:12];
+%         other_datasets = other_datasets(strcmp(answer, 'YES'));
+%         other_datasets = other_datasets(other_datasets ~= counter);
+%         for a = other_datasets
+%             [EEG_trials] = SSP_SIR_trials(EEG, param(counter).L_ave, ...
+%                 param(a).topo, ...
+%                 param(counter).kernel, []);
+%             EEG.data =  EEG_trials.data;
+%         end
+% 
+%         % baseline correct and save
+%         EEG = pop_rmbase(EEG, baseline, []);
+%         name = sprintf('%s AGSICI P1 S%s %s %s %s all_filt', prefix, subj, orientation{o}, intensity{i}, suffix); 
+%         [ALLEEG EEG CURRENTSET] = pop_newset(ALLEEG, EEG, counter, 'setname', name, 'overwrite', 'on', 'gui', 'off'); 
+%         eeglab redraw
+% 
+%         % visual check - after SSP-SIR
+%         figure;
+%         pop_timtopo(EEG, [-50  100], [5 10  25 45 75]);
+%         sgtitle(sprintf('S%s - %s, %s %%rMT - FINAL', subj, strrep(orientation{o}, '_', ' '), intensity{i}))
+% 
+%         % save dataset
+%         name = sprintf('%s AGSICI P1 S%s %s %s %s all_filt.set', prefix, subj, orientation{o}, intensity{i}, suffix);  
+%         pop_saveset(EEG, 'filename', name, 'filepath', folder_output);
+% 
+%         % update counter
+%         counter = counter + 1;
+%     end
+% end
+clear suffix time_range baseline o i a counter name other_datasets param answer_fig f figures
 
 %% export back to letswave
 % ----- section input -----
@@ -478,22 +492,26 @@ for o = 1:length(orientation)
     for i = 1:length(intensity)  
         fprintf('...%s ', intensity{i})
         % depending on whether EEGLAB is running:
-        if exist('eeglab', 'file') == 2 && length(ALLEEG) >= counter
-            % select the dataset in EEGLAB
-            EEG = ALLEEG(counter);
-            [ALLEEG EEG CURRENTSET] = eeg_store(ALLEEG, EEG, counter);
-            eeglab redraw    
-        
+        if ~isempty(findobj('Tag', 'EEGLAB'))
+            if length(ALLEEG) >= counter
+                % select the dataset in EEGLAB
+                EEG = ALLEEG(counter);
+                [ALLEEG EEG CURRENTSET] = eeg_store(ALLEEG, EEG, counter);
+                eeglab redraw   
+            else
+                % load the dataset
+                name = sprintf('%s AGSICI P1 S%s %s %s %s.set', prefix, subj, orientation{o}, intensity{i}, suffix); 
+                EEG = pop_loadset('filename', name, 'filepath', folder_output);
+                [ALLEEG EEG CURRENTSET] = eeg_store(ALLEEG, EEG, counter);
+                eeglab redraw  
+            end        
         else
-            % launch eeglab if necessary
-            if exist('eeglab', 'file') == 0
-                % add eeglab and fastica to the of search path
-                addpath(fullfile(folder_toolbox,'eeglab2022.1'));
-                addpath(fullfile(folder_toolbox,'FastICA_25'));
-                
-                % launch eeglab and generate an empty EEGLAB structure
-                eeglab 
-            end
+            % add eeglab and fastica to the of search path
+            addpath(fullfile(folder_toolbox,'eeglab2022.1'));
+            addpath(fullfile(folder_toolbox,'FastICA_25'));
+            
+            % launch eeglab and generate an empty EEGLAB structure
+            eeglab 
             
             % load the dataset
             name = sprintf('%s AGSICI P1 S%s %s %s %s.set', prefix, subj, orientation{o}, intensity{i}, suffix); 
@@ -641,7 +659,7 @@ clear suffix counter s filenames filename d dataset option lwdataset
 %% baseline correct and average
 % ----- section input -----
 suffix = {'bl' 'avg'};
-baseline = [-0.25 -0.005];
+baseline = [-0.25 -0.005];=
 % ------------------------- 
 % add letswave 7 to the top of search path
 addpath(genpath([folder_toolbox '\letswave7-master']));
@@ -674,7 +692,7 @@ end
 for s = 1:length(suffix)
     prefix = [suffix{s} ' ' prefix];
 end
-clear suffix baseline s option lwdata
+clear suffix baseline o i s option lwdata
 
 %% functions
 function export_EEGLAB(lwdata, filename, ref, subj)
