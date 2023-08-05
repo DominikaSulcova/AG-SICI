@@ -4,7 +4,7 @@
 % clear all; clc;
 
 % dataset
-subject = 4;
+subject = 7;
 sequence = {'across' 'along';'reversed' 'normal'};
 block = 1:8;
 orientation = {'along_normal' 'along_reversed' 'across_normal' 'across_reversed'};
@@ -329,30 +329,26 @@ ref = 'averef';
 % add letswave 7 to the top of search path
 addpath(genpath([folder_toolbox '\letswave7-master']));
 
-% cycle through subjects
-fprintf('exporting to EEGLAB\n')
-for s = 1:length(subject)
-    % export in .set format
-    fprintf('subject %d:\n', subject(s))
-    for o = 1:length(orientation)
-        fprintf('%s - ', strrep(orientation{o}, '_', ' '))
-        for i = 1:length(intensity)
-            fprintf('%s ... ', intensity{i})    
+% export in .set format
+fprintf('exporting to EEGLAB:\n')
+for o = 1:length(orientation)
+    fprintf('%s - ', strrep(orientation{o}, '_', ' '))
+    for i = 1:length(intensity)
+        fprintf('%s ... ', intensity{i})    
 
-            % load the data
-            name = sprintf('%s AGSICI P1 S%s %s %s', prefix, subj, orientation{o}, intensity{i});
-            option = struct('filename', name);
-            lwdata = FLW_load.get_lwdata(option);
+        % load the data
+        name = sprintf('%s AGSICI P1 S%s %s %s', prefix, subj, orientation{o}, intensity{i});
+        option = struct('filename', name);
+        lwdata = FLW_load.get_lwdata(option);
 
-            % export in .set format        
-            export_EEGLAB(lwdata, name, ref, subj);
-        end
-            fprintf('\n')
+        % export in .set format        
+        export_EEGLAB(lwdata, name, ref, subj);
     end
+        fprintf('\n')
 end
 fprintf('done.\n')
 
-clear ref o i s name option lwdata
+clear ref o i name option lwdata
 
 %% SSP-SIR
 % ----- section input -----
@@ -659,7 +655,7 @@ clear suffix counter s filenames filename d dataset option lwdataset
 %% baseline correct and average
 % ----- section input -----
 suffix = {'bl' 'avg'};
-baseline = [-0.25 -0.005];=
+baseline = [-0.25 -0.005];
 % ------------------------- 
 % add letswave 7 to the top of search path
 addpath(genpath([folder_toolbox '\letswave7-master']));
@@ -693,6 +689,45 @@ for s = 1:length(suffix)
     prefix = [suffix{s} ' ' prefix];
 end
 clear suffix baseline o i s option lwdata
+
+%% export for Ragu
+% ----- section input -----
+time_window = [-0.05, 0.3];
+% -------------------------
+% calculate crop limits
+load(sprintf('%s\\%s AGSICI P1 S%s %s %s.lw6', folder_output, prefix, subj, orientation{1}, intensity{1}), '-mat')                    
+x_start = (time_window(1) - header.xstart)/header.xstep;
+x_end = (time_window(2) - header.xstart)/header.xstep;
+
+% write text files for Ragu 
+fprintf('exporting for Ragu:\n')
+for o = 1:length(orientation)
+    fprintf('%s ', strrep(orientation{o}, '_', ' '))
+    for i = 1:length(intensity)
+        fprintf('%s %%rMT... ', intensity{i}) 
+        % load the data
+        name_old = sprintf('%s\\%s AGSICI P1 S%s %s %s.mat', folder_output, prefix, subj, orientation{o}, intensity{i});
+        load(name_old)
+        data = squeeze(data(:, 1:32, :, :, :, x_start:x_end))';
+
+        % save as .csv               
+        name = sprintf('AGSICI P1 S%s %s %s.csv', subj, orientation{o}, intensity{i});
+        writematrix(data, sprintf('%s\\export\\%s', folder_output, name));
+        fprintf('\n')
+    end
+end
+fprintf('done.\n')
+
+% create the montage file
+% name = sprintf('%s\\export\\AGSICI_montage.xyz', folder_output);
+% fileID = fopen(name, 'a');
+% fprintf(fileID, '32\r\n');
+% for a = 1:32
+%     fprintf(fileID, '%.4f %.4f %.4f %s\r\n', ...
+%         header.chanlocs(a).X, header.chanlocs(a).Y, header.chanlocs(a).Z, header.chanlocs(a).labels);
+% end
+% fclose(fileID);
+clear o i name_old data x_start x_end name time_window fileID a header   
 
 %% functions
 function export_EEGLAB(lwdata, filename, ref, subj)
