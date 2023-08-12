@@ -4,8 +4,8 @@
 % clear all; clc;
 
 % dataset
-subject = 7;
-sequence = {'across' 'along';'reversed' 'normal'};
+subject = 13;
+sequence = {'along' 'across'; 'normal' 'reversed'};
 block = 1:8;
 orientation = {'along_normal' 'along_reversed' 'across_normal' 'across_reversed'};
 intensity = {'100' '120' '140'};
@@ -17,7 +17,6 @@ else
    subj = num2str(subject); 
 end
 
-%%
 % choose relevant directories
 folder_toolbox = uigetdir(pwd, 'Choose the toolbox folder');       % letswave + eeglab masterfiles
 folder_output = uigetdir(pwd, 'Choose the output folder');         % processed data
@@ -83,7 +82,7 @@ sound(soundwave)
 
 %% preprocess 
 % ----- section input -----
-suffix = {'reref' 'dc' 'ep' 'art-sup' 'ds'};
+suffix = {'dc' 'ep' 'art-sup' 'ds'};
 eventcode = 'B - Stimulation';
 epoch = [-1 3];
 interp = [-0.003, 0.003];
@@ -107,10 +106,6 @@ for s = 1:2
         % load data and header
         [header, data] = CLW_load(filename);
         
-        % rereference to common average
-        fprintf('...rereferencing to average')
-        [header, data, ~] = RLW_rereference(header, data, 'apply_list', {header.chanlocs.labels}, 'reference_list', {header.chanlocs.labels});
-
         % remove DC and apply linear detrend
         fprintf('...removing DC + detrending')
         [header, data, ~] = RLW_dc_removal(header, data, 'linear_detrend', 1);
@@ -134,13 +129,14 @@ for s = 1:2
 
         % save for letswave
         fprintf('...done.\n')
-        header.name = [suffix{5} ' ' suffix{4} ' ' suffix{3} ' ' suffix{2} ' ' suffix{1} ' ' header.name];
+        header.name = [suffix{4} ' ' suffix{3} ' ' suffix{2} ' ' suffix{1} ' ' header.name];
         CLW_save([],header, data);
     end
 end
+fprintf('\n')
 
 % create prefix
-prefix = [suffix{5} ' ' suffix{4} ' ' suffix{3} ' ' suffix{2} ' ' suffix{1}];
+prefix = [suffix{4} ' ' suffix{3} ' ' suffix{2} ' ' suffix{1}];
 clear suffix eventcode epoch interp ds_ratio s b file filename header data datasize 
 sound(soundwave)
 
@@ -161,7 +157,7 @@ clear outcome
 % assign eventcodes
 fprintf('assigning eventcodes:\n')
 for s = 1:2
-    fprintf('Session %d - %s:', s, sequence{1, s})
+    fprintf('session %d - %s:', s, sequence{1, s})
     
     % identify stimulation order
     switch sequence{2, s}
@@ -214,6 +210,7 @@ for s = 1:2
     end
     fprintf('...done.\n')
 end
+fprintf('\n')
 
 % add letswave 7 to the top of search path
 addpath(genpath([folder_toolbox '\letswave7-master']));
@@ -264,6 +261,7 @@ for o = 1:length(orientation)
     end
 end
 fprintf('...done.\n')
+fprintf('\n')
 clear o files f filename option lwdata lwdataset data2merge i 
 
 %% visual inspection, bad channels removal
@@ -281,15 +279,8 @@ epoch2remove = {[], ...
 % add letswave 7 to the top of search path
 addpath(genpath([folder_toolbox '\letswave7-master']));
 
-% identify subject
-if subject < 10
-   subj = ['0' num2str(subject)];
-else
-   subj = num2str(subject); 
-end
-
 % cycle through current dirrections
-fprintf('Subject %s - %s:\n', subj, session)
+fprintf('removing bad trials - %s STS:\n', session)
 for c = 1:length(current)
     for i = 1:length(intensity)
         fprintf('%s current - %s %%rMT: ', current{c}, intensity{i})
@@ -323,9 +314,6 @@ fprintf('\n')
 clear session epoch2remove c i filename epochs epoch2keep e option lwdata
 
 %% export for EEGLAB
-% ----- section input -----
-ref = 'averef';
-% -------------------------
 % add letswave 7 to the top of search path
 addpath(genpath([folder_toolbox '\letswave7-master']));
 
@@ -342,15 +330,16 @@ for o = 1:length(orientation)
         lwdata = FLW_load.get_lwdata(option);
 
         % export in .set format        
-        export_EEGLAB(lwdata, name, ref, subj);
+        export_EEGLAB(lwdata, name, subj);
     end
         fprintf('\n')
 end
 fprintf('done.\n')
+fprintf('\n')
 
 clear ref o i name option lwdata
 
-%% SSP-SIR
+%% bad channel inspection & SSP-SIR
 % ----- section input -----
 suffix = 'sspsir';
 time_range = [-0.005, 0.3];
@@ -361,6 +350,7 @@ addpath(fullfile(folder_toolbox,'eeglab2022.1'));
 addpath(fullfile(folder_toolbox,'FastICA_25'));
 
 % launch eeglab and generate an empty EEGLAB structure
+fprintf('launching EEGLAB:\n')
 eeglab 
 
 % apply SSPSIR individually to each dataset and save the filters
@@ -377,6 +367,35 @@ for o = 1:length(orientation)
         EEG = pop_chanedit(EEG, 'lookup', [folder_toolbox '\eeglab2022.1\plugins\dipfit\standard_BEM\elec\standard_1005.elc']);
         [ALLEEG EEG CURRENTSET] = eeg_store(ALLEEG, EEG, counter);
         eeglab redraw;
+
+        % visualize to identify possible bad channels
+        figure; 
+        pop_plottopo(pop_select(EEG, 'time', [-0.1 0.3]), [] , '', 0, 'ydir', 1, 'ylim', [-30 30]);
+        sgtitle(sprintf('S%s - %s, %s %%rMT', subj, strrep(orientation{o}, '_', ' '), intensity{i}))
+        interp = inputdlg('Which channels do you want to interpolate?', 'Bad channels', [1 35], {'none'});
+            
+        % remove bad channels if necessary  
+        interp = split(interp, ' ');
+        if strcmp(interp{1}, 'none')
+        else
+            % identify electrodes to interpolate
+            for t = 1:length(interp)
+                for e = 1:length(EEG.chanlocs)
+                    if strcmp(EEG.chanlocs(e).labels, interp{t})
+                        interp_e(t) = e;
+                    end
+                end
+            end
+            EEG = pop_interp(EEG, interp_e, 'spherical'); 
+            [ALLEEG EEG CURRENTSET] = eeg_store(ALLEEG, EEG, counter);
+            eeglab redraw;
+        end
+
+        % re-reference to common average & baseline correct
+        EEG = pop_reref(EEG, []);
+        EEG = pop_rmbase(EEG, baseline, []);
+        [ALLEEG EEG CURRENTSET] = pop_newset(ALLEEG, EEG, counter,'overwrite','on','gui','off'); 
+        eeglab redraw;      
 
         % visual check - before SSP-SIR
         figure; 
@@ -428,6 +447,8 @@ if strcmp(answer_fig, 'YES')
     for f = 1:length(figures)
         if strcmp(figures(f).Name, ' timtopo()')
             close(figures(f))
+        elseif strcmp(figures(f).Name, '')
+            close(figures(f))
         end
     end
 end
@@ -471,7 +492,7 @@ end
 %         counter = counter + 1;
 %     end
 % end
-clear suffix time_range baseline o i a counter name other_datasets param answer_fig f figures
+clear suffix time_range baseline o i a counter name e t interp interp_e other_datasets param answer_fig f figures
 
 %% export back to letswave
 % ----- section input -----
@@ -546,7 +567,6 @@ for o = 1:length(orientation)
     end
     fprintf('\n')
 end
-fprintf('done.\n')
 sound(soundwave)
 
 % update prefix
@@ -612,6 +632,7 @@ for o = 1:length(orientation)
     end
 end
 fprintf('done.\n')
+fprintf('\n')
 sound(soundwave)
 
 % update prefix
@@ -620,7 +641,7 @@ for s = 1:length(suffix)
 end
 clear suffix interp bandpass notch crop baseline o i s filename option lwdata header data
 
-%% calculate ICA matrix
+ %% calculae ICA matrix 
 % ----- section input -----
 suffix = {'ica' 'sp_filter'};
 % -------------------------
@@ -644,6 +665,7 @@ for s = 1:size(sequence, 1)
     % compute the ICA matrix
     option = struct('ICA_mode', 3, 'algorithm', 1, 'percentage_PICA', 100, 'criterion_PICA', 'LAP', 'suffix', suffix{1}, 'is_save', 1);
     lwdataset = FLW_compute_ICA_merged.get_lwdataset(lwdataset, option);
+    fprintf('\n')
 end
 
 % update prefix
@@ -683,6 +705,7 @@ for o = 1:length(orientation)
         lwdata = FLW_average_epochs.get_lwdata(lwdata, option);
     end
 end
+fprintf('\n')
 
 % update prefix
 for s = 1:length(suffix)
@@ -713,10 +736,11 @@ for o = 1:length(orientation)
         % save as .csv               
         name = sprintf('AGSICI P1 S%s %s %s.csv', subj, orientation{o}, intensity{i});
         writematrix(data, sprintf('%s\\export\\%s', folder_output, name));
-        fprintf('\n')
     end
+    fprintf('\n')
 end
 fprintf('done.\n')
+fprintf('\n')
 
 % create the montage file
 % name = sprintf('%s\\export\\AGSICI_montage.xyz', folder_output);
@@ -730,7 +754,7 @@ fprintf('done.\n')
 clear o i name_old data x_start x_end name time_window fileID a header   
 
 %% functions
-function export_EEGLAB(lwdata, filename, ref, subj)
+function export_EEGLAB(lwdata, filename, subj)
     % dataset
     EEG.setname = filename;
     EEG.filename = [];
@@ -759,9 +783,6 @@ function export_EEGLAB(lwdata, filename, ref, subj)
         end
         EEG.event = rmfield(EEG.event,'code');
     end
-    
-    % add reference
-    EEG.ref = ref;
     
     % create required empty fields
     EEG.icawinv = [];
