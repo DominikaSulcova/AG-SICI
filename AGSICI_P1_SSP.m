@@ -753,6 +753,68 @@ fprintf('\n')
 % fclose(fileID);
 clear o i name_old data x_start x_end name time_window fileID a header   
 
+%% save individual data to the output structure
+% ----- section input -----
+subjects = [1, 3:18, 20, 21];
+time_window = [-0.05, 0.3];
+% -------------------------
+% add letswave 7 to the top of search path
+addpath(genpath([folder_toolbox '\letswave7-master']));
+
+% results folder
+folder_results = uigetdir(pwd, 'Choose the Results folder');
+output_file = [folder_results '\AG-SICI_' study '_SSP.mat'];
+
+% prepare empty structure
+data_individual = [];
+save(output_file, 'data_individual')
+
+% loop through subjects
+for s = 1:length(subjects)
+    % identify subject
+    if subjects(s) < 10
+       subj = ['0' num2str(subjects(s))];
+    else
+       subj = num2str(subjects(s)); 
+    end
+    fprintf('subject %s ', subj)
+
+    % prepare data
+    for o = 1:length(orientation)    
+        for i = 1:length(intensity)
+            % load 
+            option = struct('filename', sprintf('%s\\%s AGSICI P1 S%s %s %s.lw6', folder_output, prefix, subj, orientation{o}, intensity{i}));
+            lwdata = FLW_load.get_lwdata(option);
+
+            % crop
+            option = struct('xcrop_chk', 1, 'xstart', time_window(1) - lwdata.header.xstep, 'xend', time_window(2), 'suffix', '', 'is_save', 0);
+            lwdata = FLW_crop_epochs.get_lwdata(lwdata, option);
+
+            % save default header
+            if s == 1 && o == 1 && i == 1
+                header = lwdata.header;
+                header.name = 'template';
+                save(output_file, 'header', '-append');
+            end
+    
+            % append to the data variable
+            data_individual(o, i, s, :, :) = squeeze(lwdata.data(1, :, 1, 1, 1, :));
+            save(output_file, 'data_individual', '-append');
+        end
+    end    
+end
+counter = 1;
+for o = 1:2   
+    for c = 1:2
+        for i = 1:length(intensity)
+            data_individual(counter, i, 16, :, :) = squeeze(AGSICI_data(o, c, i, 16, 1:32, :));
+            save(output_file, 'data_individual', '-append');
+        end
+        counter = counter + 1;
+    end
+end
+data_individual(o, i, 16, 1, 1:20)
+
 %% functions
 function export_EEGLAB(lwdata, filename, subj)
     % dataset

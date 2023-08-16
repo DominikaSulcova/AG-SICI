@@ -103,8 +103,8 @@ figure_counter = 1;
 
 % input/output folders
 folder_results = uigetdir(pwd, 'Choose the Results folder');
-folder_figures = [folder_results '\AG-SICI_' study '_figures'];
-output_file = [folder_results '\AG-SICI_' study '.mat'];
+folder_figures = [folder_results '\AG-SICI_' study '_figures_SSP'];
+output_file = [folder_results '\AG-SICI_' study '_SSP.mat'];
 
 % check for colour scheme
 answer = questdlg('Do you want to choose a new colour scheme?', 'Colour scheme', 'YES', 'NO', 'NO'); 
@@ -127,10 +127,12 @@ clear answer p i
 
 %% 1) PREPARE TEP DATA
 % ----- section input -----
-outliers = [4];
+outliers = [];
 target = {'CP5' 'P3' 'P5' 'P7'};
 % -------------------------
 % load individual data, filter out outliers
+load(output_file, 'data_individual')
+load(output_file, 'header')
 load(output_file, 'AGSICI_data')
 idx = find(~ismember(1:size(AGSICI_data, 4), outliers));
 counter = 1; 
@@ -186,17 +188,20 @@ data_SEM =  squeeze(std(data_individual, 0, 3)/sqrt(size(data_individual, 3)));
 % load RAGU data
 load(output_file, 'AGSICI_microstates')
 data_MS = AGSICI_microstates;
-clear AGSICI_microstates
+load([folder_results '\AG-SICI_P1_microstates\AG-SICI_microstates_SSP.mat'])
+data_MS = rd;
+clear AGSICI_microstates rd
+save(output_file, 'data_MS', '-append');
 
-% % encode in a default structure
-% AGSICI_TEP_default = struct;
-% AGSICI_TEP_default.peak = {'P25' 'N45' 'N75' 'N100' 'P180'};
-% AGSICI_TEP_default.center = [];
-% AGSICI_TEP_default.span = [];
-% AGSICI_TEP_default.eoi = [];
-% 
-% % append to the outcome MATLAB file
-% save(output_file, 'AGSICI_TEP_default', '-append');
+% encode in a default structure
+AGSICI_TEP_default = struct;
+AGSICI_TEP_default.peak = {'P25' 'N45' 'N75' 'N100' 'P180'};
+AGSICI_TEP_default.center = [];
+AGSICI_TEP_default.span = [];
+AGSICI_TEP_default.eoi = [];
+
+% append to the outcome MATLAB file
+save(output_file, 'AGSICI_TEP_default', '-append');
 clear labels AG_peaks t e a b c counter AGSICI_muscle_activity outliers idx t e p i s t channels data header name
 
 %% 2) TEP BUTTERFLY + GFP - individual conditions
@@ -438,7 +443,7 @@ clear factor factor_n data_visual fig x_lim x_step x x_start x_end fig fig_name
 %% 6) GFP BOXPLOT
 % ----- section input -----
 factor = 'interaction';         % orientation - interaction
-toi = [31, 55];
+toi = [43, 56];
 x_step = 0.5;
 y_lim = [0, 4.5];
 % -------------------------
@@ -511,7 +516,7 @@ clear factor toi x_step y_lim x_start x_end x_info y_info data_visual fig fig_na
 
 %% 7) GFP MEAN VALUES
 % ----- section input -----
-toi = [31, 55];
+toi = [43, 56];
 x_step = 0.5;
 % -------------------------
 % identify TOI limits
@@ -519,7 +524,7 @@ x_start = (toi(1) + 50)/x_step;
 x_end = (toi(2) + 50)/x_step;
 
 % create output structure
-AGSICI_GFP_summary_WO = struct;
+AGSICI_GFP_summary = struct;
 for p = 1:length(position)
     for i = 1:length(intensity)
         % calculate individual GFP per condition (exclude target channel)
@@ -530,30 +535,30 @@ for p = 1:length(position)
         data = mean(data(:, x_start:x_end), 2);
 
         % group median
-        statement = ['AGSICI_GFP_summary_WO.' position{p} '_' intensity{i} '.median = median(data);'];
+        statement = ['AGSICI_GFP_summary.' position{p} '_' intensity{i} '.median = median(data);'];
         eval(statement)
 
         % group median
-        statement = ['AGSICI_GFP_summary_WO.' position{p} '_' intensity{i} '.mean = mean(data);'];
+        statement = ['AGSICI_GFP_summary.' position{p} '_' intensity{i} '.mean = mean(data);'];
         eval(statement)
 
         % group median
-        statement = ['AGSICI_GFP_summary_WO.' position{p} '_' intensity{i} '.SD = std(data);'];
+        statement = ['AGSICI_GFP_summary.' position{p} '_' intensity{i} '.SD = std(data);'];
         eval(statement)
 
         % group median
-        statement = ['AGSICI_GFP_summary_WO.' position{p} '_' intensity{i} '.SEM = std(data)/sqrt(length(data));'];
+        statement = ['AGSICI_GFP_summary.' position{p} '_' intensity{i} '.SEM = std(data)/sqrt(length(data));'];
         eval(statement)
     end
 end
 
 % append to general matlab file
-save(output_file, 'AGSICI_GFP_summary_WO', '-append');
+save(output_file, 'AGSICI_GFP_summary', '-append');
 clear toi x_step x_start x_end p i s data statement
 
 %% 8) GFP RADAR PLOT + CHANGE BOXPLOT
 % ----- section input -----
-toi = {[17, 30], [30.5, 56.5]};
+toi = {[43, 56]};
 x_step = 0.5;
 y_lim_rad = [0.8, 2.3]; 
 y_lim_box = [-1.2, 2.2];
@@ -663,7 +668,7 @@ for a = 1:size(AGSICI_muscle_activity.contraction.data, 1)
 end
 clear a b c AGSICI_muscle_activity
 
-% identify TOI limits
+%% identify TOI limits
 x_start = (toi(1) + 50)/x_step;
 x_end = (toi(2) + 50)/x_step;
 
@@ -676,7 +681,7 @@ end
 clear s p
 
 % plot GFP per condition, identify outliers
-[fig, outliers] = plot_box(figure_counter, data_visual, 'colour', colours([3, 6, 9, 12], :));
+[fig, outliers] = plot_box(figure_counter, data_visual, colours([3, 6, 9, 12], :));
 outliers = sort(outliers(1, :));
 
 % name and save figure
@@ -1102,9 +1107,6 @@ function fig = plot_TEP(figure_counter, x, data_visual, y_lim, varargin)
     xlabel('time (ms)');  
     ylim(y_lim);
     ylabel('amplitude (\muV)')
-    
-    % shade interpolated interval 
-    rectangle('Position', [int(1), y_lim(1), int(2) - int(1), y_lim(2) - y_lim(1)], 'FaceColor', [0.85 0.85 0.85], 'EdgeColor', 'none')
 
     % loop through channels to plot
     for a = 1:size(data_visual, 1)     
@@ -1115,6 +1117,9 @@ function fig = plot_TEP(figure_counter, x, data_visual, y_lim, varargin)
     if ~isempty(channel_n)
         P(end+1) =  plot(x, data_visual(channel_n, :), 'Color', [0 0 0], 'LineWidth', 3);
     end
+
+    % shade interpolated interval 
+    rectangle('Position', [int(1), y_lim(1), int(2) - int(1), y_lim(2) - y_lim(1)], 'FaceColor', [0.85 0.85 0.85], 'EdgeColor', 'none')
 
     % TMS stimulus
     line([0, 0], y_lim, 'Color', [0 0 0], 'LineWidth', 3, 'LineStyle', '--')
@@ -1148,14 +1153,14 @@ function fig = plot_GFP(figure_counter, x, data_visual, y_lim, varargin)
     ylim(y_lim);
     ylabel('amplitude (\muV)')
     
-    % shade interpolated interval 
-    rectangle('Position', [-5, y_lim(1), 15, y_lim(2) - y_lim(1)], 'FaceColor', [0.85 0.85 0.85], 'EdgeColor', 'none')
-    
     % shade GFP
     F = fill([x fliplr(x)],[data_visual zeros(1, length(x))], colour, 'linestyle', 'none');
 
     % plot GFP line
     P = plot(x, data_visual, 'Color', [0 0 0], 'LineWidth', 3);
+
+    % shade interpolated interval 
+    rectangle('Position', [-5, y_lim(1), 15, y_lim(2) - y_lim(1)], 'FaceColor', [0.85 0.85 0.85], 'EdgeColor', 'none')
 
     % TMS stimulus
     line([0, 0], y_lim, 'Color', [0 0 0], 'LineWidth', 3, 'LineStyle', '--')
@@ -1206,7 +1211,7 @@ function peak_x = GFP_peaks(y, time_window, xstep, labeled, varargin)
     line([0, 0], yl, 'LineStyle', '--', 'Color', [0 0 0], 'LineWidth', 3)
 
     % find peaks 
-    [pks, locs] = findpeaks(y, 'MinPeakDistance', 5, 'MinPeakProminence', 0.01);
+    [pks, locs] = findpeaks(y, 'MinPeakDistance', 5, 'MinPeakProminence', 0.005);
     for a = 1:length(locs)
         if time_window(1) + locs(a)*xstep <= 15
             idx(a) = false;
@@ -1692,5 +1697,7 @@ function [fig, varargout] = plot_box(figure_counter, data_visual, colour)
             end
         end
     end
+    
+    
 end
 
