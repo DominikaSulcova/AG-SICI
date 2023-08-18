@@ -1092,6 +1092,114 @@ clear orientation toi x_lim y_lim x_step x_start x_end p i s o counter categorie
     data_visual x y SEM fig fig_name muscles_subset statement
 
 %% 15) MUSCLES - TEP GFP
+% ----- section input -----
+toi_TEP = {[15 33], [33 60]};
+toi_artifact = [3 10];
+categories = 4;
+x_step = 0.5;
+x_start = -50;
+% -------------------------
+% check for colour scheme
+answer = questdlg('Do you want to choose a new colour scheme?', 'Colour scheme', 'YES', 'NO', 'NO'); 
+switch answer
+    case 'YES'
+        for a = 1:2
+            for c = 1:categories
+                colours_muscles((a-1)*categories + c, :) = uisetcolor; 
+            end
+        end
+        save([folder_git '\AGSICI_' study 'colours_muscles.mat'], 'colours_muscles')
+    case 'NO'
+        if exist([folder_git '\AGSICI_' study '_colours_muscles.mat']) > 0
+            load([folder_git '\AGSICI_' study '_colours_muscles.mat'])
+        else
+            disp('No colour scheme found in git directory!')    
+        end
+end
+clear answer a c
+
+% identify artifact TOI limits
+x_start = (toi_artifact(1) - x_start)/x_step;
+x_end = (toi_artifact(2) - x_start)/x_step;
+
+% create a table with muscle artifact sizes
+muscles_table = table;
+counter = 1;
+for p = 1:length(position)
+    for i = 1:length(intensity)
+        for s = 1:size(data_muscles_gfp, 3) 
+            % fill in the line
+            muscles_table.subject(counter) = subject(s);
+            muscles_table.subject_n(counter) = s;
+            muscles_table.position(counter) = p;
+            muscles_table.intensity(counter) = i;
+            muscles_table.contraction(counter) = mean(data_muscles_gfp(p, i, s, x_start:x_end));
+            
+            % update the counter
+            counter = counter + 1;
+        end
+    end
+end
+AGSICI_muscles_summary.data = muscles_table;
+
+% sort by contraction size
+muscles_table = sortrows(muscles_table, 5); 
+for c = 1:categories
+    muscles_table.category((c-1)*floor(height(muscles_table)/categories) + [1:floor(height(muscles_table)/categories)]) = c;
+end
+if any(muscles_table.category == 0)
+    muscles_table.category(find(muscles_table.category == 0)) = 4;
+end
+
+% loop through categories
+for c = 1:categories
+    % subset the data
+    muscles_subset = muscles_table(muscles_table.category == c, 2:5);
+    
+    % count position ratio
+    for p = 1:length(position)
+        AGSICI_muscles_summary.all(c).position(p) = height(muscles_subset(muscles_subset.position == p, 1));
+    end
+    
+    % count intensity ratio
+    for i = 1:length(intensity)
+        AGSICI_muscles_summary.all(c).intensity(i) = height(muscles_subset(muscles_subset.intensity == i, 1));
+    end
+    
+    % extract mean values
+    AGSICI_muscles_summary.all(c).mean = mean(muscles_subset.contraction);
+    AGSICI_muscles_summary.all(c).SD = std(muscles_subset.contraction);
+    AGSICI_muscles_summary.all(c).SEM = std(muscles_subset.contraction)/sqrt(size(data_muscles, 3));
+    
+    % save muscle data for letswave
+    clear data header
+    for a = 1:height(muscles_subset)
+        data(a, :, 1, 1, 1, :) = data_muscles(muscles_subset.position(a), muscles_subset.intensity(a), muscles_subset.subject_n(a), :, :);
+    end
+    load([folder_git '\header_example.mat'])
+    name = sprintf('merged_subj AGSICI %s muscles all cat%d', study, c);
+    savelw(data, header, name) 
+    
+    % append the data for future analysis
+    statement = sprintf('AGSICI_muscles_summary.data_muscles.cat%d = data', c);
+    eval(statement)
+    
+    % save TEP data for letswave
+    clear data header
+    for a = 1:height(muscles_subset)
+        data(a, :, 1, 1, 1, :) = data_individual(muscles_subset.position(a), muscles_subset.intensity(a), muscles_subset.subject_n(a), :, :);
+    end
+    load([folder_git '\header_example.mat'])
+    name = sprintf('merged_subj AGSICI %s muscles TEP all cat%d', study, c);
+    savelw(data, header, name) 
+    
+    % append the data for future analysis
+    statement = sprintf('AGSICI_muscles_summary.data_TEP.cat%d = data', c);
+    eval(statement)  
+end
+
+% calculate TEP GFP for each category
+
 
 %% functions
 function fig = plot_TEP(figure_counter, x, data_visual, y_lim, varargin)
