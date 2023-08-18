@@ -105,6 +105,7 @@ figure_counter = 1;
 folder_results = uigetdir(pwd, 'Choose the Results folder');
 folder_figures = [folder_results '\AG-SICI_' study '_figures_SSP'];
 output_file = [folder_results '\AG-SICI_' study '_SSP.mat'];
+cd(folder_results)
 
 % check for colour scheme
 answer = questdlg('Do you want to choose a new colour scheme?', 'Colour scheme', 'YES', 'NO', 'NO'); 
@@ -654,21 +655,25 @@ clear toi x_step y_lim t data data_visual i p s x_start x_end fig a
 toi = [3, 10];
 x_step = 0.5;
 % -------------------------
-% load individual data
-load(output_file, 'AGSICI_muscle_activity')
-counter = 1; 
-for a = 1:size(AGSICI_muscle_activity.contraction.data, 1)
-    for b = 1:size(AGSICI_muscle_activity.contraction.data, 2)
-        for c = 1:size(AGSICI_muscle_activity.contraction.data, 3)
-            data_muscles(counter, c, :, :, :) = AGSICI_muscle_activity.contraction.data(a, b, c, :, :, :);   
-            data_muscles_gfp(counter, c, :, :) = AGSICI_muscle_activity.contraction.GFP(a, b, c, :, :);
-        end
-        counter = counter + 1;
-    end
-end
-clear a b c AGSICI_muscle_activity
+% % load individual data
+% load(output_file, 'AGSICI_muscle_activity')
+% counter = 1; 
+% for a = 1:size(AGSICI_muscle_activity.contraction.data, 1)
+%     for b = 1:size(AGSICI_muscle_activity.contraction.data, 2)
+%         for c = 1:size(AGSICI_muscle_activity.contraction.data, 3)
+%             data_muscles(counter, c, :, :, :) = AGSICI_muscle_activity.contraction.data(a, b, c, :, :, :);   
+%             data_muscles_gfp(counter, c, :, :) = AGSICI_muscle_activity.contraction.GFP(a, b, c, :, :);
+%         end
+%         counter = counter + 1;
+%     end
+% end
+% clear a b c AGSICI_muscle_activity
 
-%% identify TOI limits
+% % load muscle data
+% load(output_file, 'data_muscles')
+% load(output_file, 'data_muscles_gfp')
+
+% identify TOI limits
 x_start = (toi(1) + 50)/x_step;
 x_end = (toi(2) + 50)/x_step;
 
@@ -681,8 +686,7 @@ end
 clear s p
 
 % plot GFP per condition, identify outliers
-[fig, outliers] = plot_box(figure_counter, data_visual, colours([3, 6, 9, 12], :));
-outliers = sort(outliers(1, :));
+fig = plot_box(figure_counter, data_visual, colours([3, 6, 9, 12], :));
 
 % name and save figure
 fig_name = 'MUSCLES_outliers';
@@ -692,7 +696,7 @@ saveas(fig, [folder_figures '\' fig_name '.svg'], 'svg')
 % update the counter
 figure_counter = figure_counter + 1;  
 
-% boxplot without outliers (average across intensities)
+%% boxplot without outliers (average across intensities)
 idx = find(~ismember(1:size(data_muscles_gfp, 3), outliers));
 fig = plot_box(figure_counter, data_visual(idx, :), colours([2, 5, 8, 11], :));
 
@@ -748,6 +752,7 @@ clear toi x_step idx x_start x_end p data statement
 % ----- section input -----
 toi = [3 10];
 x_step = 0.5;
+outliers = [4, 11];
 % -------------------------
 % identify outliers
 idx = find(~ismember(1:size(data_muscles_gfp, 3), outliers));
@@ -787,7 +792,7 @@ ylabel('GFP (\muV \pm SEM)');
 xlim([0.75, length(intensity) + 0.25])
       
 % name and save figure
-fig_name = 'MUSCLES_lineplot_all_WO';
+fig_name = 'MUSCLES_lineplot_WO';
 savefig([folder_figures '\' fig_name '.fig'])
 saveas(fig, [folder_figures '\' fig_name '.svg'], 'svg')
 
@@ -921,10 +926,10 @@ clear toi x_lim y_lim x_step x_start x_end p i s counter categories c a data hea
 %% 13) MUSCLES ARTIFACT
 % ----- section input -----
 channel = 'CP5';
-x_lim = [-5, 30];
+x_lim = [-5, 25];
 x_step = 0.5;
-y_lim = [-50, 150];
-interpolation = [-2 2];
+y_lim = [-400, 400];
+interpolation = [-2 3];
 % -------------------------
 % avereage data across categories
 data_visual = squeeze(mean(data_muscles(:, :, :, :, (x_lim(1) + 50)/x_step:(x_lim(2) + 50)/x_step), [1 2 3]));
@@ -947,6 +952,21 @@ fig_name = sprintf('MUSCLES_butterfly_%s', channel);
 savefig([folder_figures '\' fig_name '.fig'])
 saveas(fig, [folder_figures '\' fig_name '.svg'], 'svg')
 figure_counter = figure_counter + 1;
+
+% save all muscle data for letswave - per category
+load([folder_git '\header_example.mat'])
+for p = 1:length(position)
+    for i = 1:length(intensity)
+        for s = 1:length(subject)
+            data(s, :, 1, 1, 1, :) = data_muscles(p, i, s, :, :);
+        end
+        name = sprintf('merged_subj AGSICI %s muscles all %s %s', study, position{p}, intensity{i});
+        savelw(data, header, name) 
+    end
+end
+
+% plot butterfly plot of a representative subject
+
         
 clear channel interpolation x_lim x_step y_lim data_visual x e channel_n fig fig_name
 
@@ -958,6 +978,7 @@ x_lim = [-5, 30];
 x_step = 0.5;
 y_lim = [-10, 350];
 categories = 4;
+outliers = [4, 11];
 % -------------------------
 % check for colour scheme
 answer = questdlg('Do you want to choose a new colour scheme?', 'Colour scheme', 'YES', 'NO', 'NO'); 
@@ -978,23 +999,26 @@ switch answer
 end
 clear answer a c
 
-% load the data table 
-if exist('muscles_table')~=1
-    load(output_file, 'AGSICI_muscles_summary');
-end
-
-% deal with potential outliers
-muscles_table = AGSICI_muscles_summary.data(~ismember(AGSICI_muscles_summary.data.subject_n, outliers), :);
-AGSICI_muscles_summary_WO.data = muscles_table;
+% % load the data table 
+% if exist('muscles_table')~=1
+%     load(output_file, 'AGSICI_muscles_summary');
+% end
+% 
+% % deal with potential outliers
+% muscles_table = AGSICI_muscles_summary.data(~ismember(AGSICI_muscles_summary.data.subject_n, outliers), :);
+% AGSICI_muscles_summary.data_WO = muscles_table;
 
 % loop through orientations
 for o = 1:length(orientation)    
     % subset and sort by contraction size
-    muscles_table = AGSICI_muscles_summary_WO.data(AGSICI_muscles_summary_WO.data.position == (o - 1)*2 + 1 | ...
-        AGSICI_muscles_summary_WO.data.position == (o - 1)*2 + 2, :);
+    muscles_table = AGSICI_muscles_summary.data_WO(AGSICI_muscles_summary.data_WO.position == (o - 1)*2 + 1 | ...
+        AGSICI_muscles_summary.data_WO.position == (o - 1)*2 + 2, :);
     muscles_table = sortrows(muscles_table, 5); 
     for c = 1:categories
-        muscles_table.category((c-1)*(height(muscles_table)/categories) + [1:height(muscles_table)/categories]) = c;
+        muscles_table.category((c-1)*floor(height(muscles_table)/categories) + [1:floor(height(muscles_table)/categories)]) = c;
+    end
+    if any(muscles_table.category == 0)
+        muscles_table.category(find(muscles_table.category == 0)) = 4;
     end
 
     % loop through categories
@@ -1004,22 +1028,22 @@ for o = 1:length(orientation)
 
         % count position ratio
         for p = 1:length(position)
-            statement = ['AGSICI_muscles_summary_WO.' orientation{o} '(c).position(p) = height(muscles_subset(muscles_subset.position == p, 1));'];
+            statement = ['AGSICI_muscles_summary.' orientation{o} '_WO(c).position(p) = height(muscles_subset(muscles_subset.position == p, 1));'];
             eval(statement)
         end
 
         % count intensity ratio
         for i = 1:length(intensity)
-            statement = ['AGSICI_muscles_summary_WO.' orientation{o} '(c).intensity(i) = height(muscles_subset(muscles_subset.intensity == i, 1));'];
+            statement = ['AGSICI_muscles_summary.' orientation{o} '_WO(c).intensity(i) = height(muscles_subset(muscles_subset.intensity == i, 1));'];
             eval(statement)
         end
 
         % extract mean values
-        statement = ['AGSICI_muscles_summary_WO.' orientation{o} '(c).mean = mean(muscles_subset.contraction);'];
+        statement = ['AGSICI_muscles_summary.' orientation{o} '_WO(c).mean = mean(muscles_subset.contraction);'];
         eval(statement)
-        statement = ['AGSICI_muscles_summary_WO.' orientation{o} '(c).SD = std(muscles_subset.contraction);'];
+        statement = ['AGSICI_muscles_summary.' orientation{o} '_WO(c).SD = std(muscles_subset.contraction);'];
         eval(statement)
-        statement = ['AGSICI_muscles_summary_WO.' orientation{o} '(c).SEM = std(muscles_subset.contraction)/sqrt(size(data_muscles, 3) - length(outliers));'];
+        statement = ['AGSICI_muscles_summary.' orientation{o} '_WO(c).SEM = std(muscles_subset.contraction)/sqrt(size(data_muscles, 3) - length(outliers));'];
         eval(statement)
         
         % save muscle data for letswave
@@ -1063,9 +1087,11 @@ for o = 1:length(orientation)
 end
 
 % append to the output file
-save(output_file, 'AGSICI_muscles_summary_WO', '-append');
+save(output_file, 'AGSICI_muscles_summary', '-append');
 clear orientation toi x_lim y_lim x_step x_start x_end p i s o counter categories c a data header name ...
     data_visual x y SEM fig fig_name muscles_subset statement
+
+%% 15) MUSCLES - TEP GFP
 
 %% functions
 function fig = plot_TEP(figure_counter, x, data_visual, y_lim, varargin)

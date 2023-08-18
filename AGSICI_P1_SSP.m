@@ -1,10 +1,11 @@
 %  processing with SSP-SIR
 
 %% parameters
-% clear all; clc;
+clear all; clc;
 
 % dataset
 subject = 13;
+subjects = [1, 3:18, 20, 21];
 sequence = {'along' 'across'; 'normal' 'reversed'};
 block = 1:8;
 orientation = {'along_normal' 'along_reversed' 'across_normal' 'across_reversed'};
@@ -754,16 +755,12 @@ fprintf('\n')
 clear o i name_old data x_start x_end name time_window fileID a header   
 
 %% save individual data to the output structure
-% ----- section input -----
-subjects = [1, 3:18, 20, 21];
-time_window = [-0.05, 0.3];
-% -------------------------
 % add letswave 7 to the top of search path
 addpath(genpath([folder_toolbox '\letswave7-master']));
 
 % results folder
 folder_results = uigetdir(pwd, 'Choose the Results folder');
-output_file = [folder_results '\AG-SICI_' study '_SSP.mat'];
+output_file = [folder_results '\AG-SICI_P1_SSP.mat'];
 
 % prepare empty structure
 data_individual = [];
@@ -814,6 +811,260 @@ for o = 1:2
     end
 end
 data_individual(o, i, 16, 1, 1:20)
+
+%% muscle artifact extraction
+% ----- section input -----
+prefix = 'visual';
+suffix = {'interp' 'reref' 'bl' 'muscles crop'};
+session = {'along' 'across'};
+time_range = [-0.05, 0.3];
+baseline = [-0.25 -0.005];
+electrodes = 1:2:31;
+gfp_toi = [3, 10];
+x_step = 0.5;
+% ------------------------- 
+% add eeglab and fastica to the of search path
+addpath(fullfile(folder_toolbox,'eeglab2022.1'));
+addpath(fullfile(folder_toolbox,'FastICA_25'));
+
+% launch eeglab and generate an empty EEGLAB structure
+fprintf('launching EEGLAB:\n')
+eeglab 
+
+% identify bad channels to interpolate
+for s = 1:length(subjects)
+    % identify subject
+    if subjects(s) < 10
+       subj = ['0' num2str(subjects(s))];
+    else
+       subj = num2str(subjects(s)); 
+    end
+    fprintf('subject %s: ', subj)
+
+    for o = 1:length(session)
+        fprintf('%s STS ... ', session{o})
+
+        % load the dataset
+        name = sprintf('%s AGSICI P1 S%s %s_normal %s.set', prefix, subj, session{o}, intensity{1}); 
+        EEG = pop_loadset('filename', name, 'filepath', folder_output);
+        [ALLEEG EEG CURRENTSET] = eeg_store(ALLEEG, EEG, CURRENTSET);
+        eeglab redraw  
+        
+        % add channel locations 
+        EEG = pop_chanedit(EEG, 'lookup', [folder_toolbox '\eeglab2022.1\plugins\dipfit\standard_BEM\elec\standard_1005.elc']);
+        [ALLEEG EEG CURRENTSET] = eeg_store(ALLEEG, EEG, CURRENTSET);
+        eeglab redraw;
+
+        % visualize to identify possible bad channels
+        figure; 
+        pop_plottopo(pop_select(EEG, 'time', [-0.1 0.3]), [] , '', 0, 'ydir', 1, 'ylim', [-30 30]);
+        sgtitle(sprintf('S%s - %s, %s %%rMT', subj, strrep(session{o}, '_', ' '), intensity{1}))
+        interp = inputdlg('Which channels do you want to interpolate?', 'Bad channels', [1 35], {'none'});
+            
+        % identify electrodes to interpolate
+        interp = split(interp, ' ');
+        if strcmp(interp{1}, 'none')
+            chan2interp{s, o} = [];
+        else            
+            for t = 1:length(interp)
+                for e = 1:length(EEG.chanlocs)
+                    if strcmp(EEG.chanlocs(e).labels, interp{t})
+                        chan2interp{s, o}(t) = e;
+                    end
+                end
+            end
+        end
+    end
+    fprintf(' done.\n')
+end
+for s = 1:length(subjects)
+    interp_manual(s).subject = subjects(s);
+    for o = 1:length(session)
+        if ~isempty(chan2interp{s, o})
+            statement = ['interp_manual(s).' session{o} ' = lwdata.header.chanlocs(chan2interp{s, o}).labels;'];
+            eval(statement)
+        else
+            statement = ['interp_manual(s).' session{o} ' = ''none'';'];
+            eval(statement)
+        end
+    end
+end
+save(output_file, 'interp_manual', '-append');
+
+% close all figures if required
+answer_fig = questdlg('Do you want to close the figures?', 'figures', 'YES', 'NO', 'YES'); 
+if strcmp(answer_fig, 'YES')
+    figures = findall(0, 'Type', 'figure');
+    for f = 1:length(figures)
+        if strcmp(figures(f).Name, ' timtopo()')
+            close(figures(f))
+        elseif strcmp(figures(f).Name, '')
+            close(figures(f))
+        end
+    end
+end
+clear ALLCOM ALLEEG CURRENTSET CURRENTSTUDY EEG globalvars LASTCOM PLUGINLIST STUDY figures 
+
+% add letswave 7 to the top of search path
+addpath(genpath([folder_toolbox '\letswave7-master']));
+
+% preprocess the data
+for s = 1:length(subjects) 
+    % identify subject
+    if subjects(s) < 10
+       subj = ['0' num2str(subjects(s))];
+    else
+       subj = num2str(subjects(s)); 
+    end
+    fprintf('subject %s:\n', subj)
+    for o = 1:length(orientation)
+        % determine the session
+        if o <= 2
+            a = 1;
+        else
+            a = 2;
+        end
+        for i = 1:length(intensity)
+            fprintf('%s - %s %%rMT\n', strrep(orientation{o}, '_', ' '), intensity{i})
+            % determine the name
+            if ~isempty(chan2interp{s, a})
+                name = sprintf('%s\\%s %s AGSICI P1 S%s %s %s.lw6', folder_output, suffix{1}, prefix, subj, orientation{o}, intensity{i});
+            else
+                name = sprintf('%s\\%s AGSICI P1 S%s %s %s.lw6', folder_output, prefix, subj, orientation{o}, intensity{i});
+            end
+    
+            % load the data
+            option = struct('filename', name);
+            lwdata = FLW_load.get_lwdata(option);
+
+            % re-reference to common average
+            fprintf('re-referencing ...')
+            option = struct('reference_list', {{lwdata.header.chanlocs(1:32).labels}}, 'apply_list', {{lwdata.header.chanlocs(1:32).labels}}, 'suffix', suffix{2}, 'is_save', 0);
+            lwdata = FLW_rereference.get_lwdata(lwdata, option);
+
+            % baseline correct
+            fprintf('subtracting baseline ...')
+            option = struct('operation', 'substract', 'xstart', baseline(1) ,'xend', baseline(2), 'suffix', suffix{3}, 'is_save', 0);
+            lwdata = FLW_baseline.get_lwdata(lwdata, option);
+
+            % crop
+            fprintf('cropping ...')
+            option=struct('xcrop_chk', 1, 'xstart', time_range(1),'xend', time_range(2), 'suffix', suffix{4},'is_save', 1);
+            lwdata = FLW_crop_epochs.get_lwdata(lwdata,option);
+            fprintf('done.\n')
+        end
+    end
+end
+
+% update the prefix
+for s = 2:length(suffix)
+    prefix = [suffix{s} ' ' prefix];
+end
+
+% extract and save individual data
+fprintf('subject ')
+for s = 1:length(subjects) 
+    % identify subject
+    if subjects(s) < 10
+       subj = ['0' num2str(subjects(s))];
+    else
+       subj = num2str(subjects(s)); 
+    end
+    fprintf(' %s ...', subj)
+    for o = 1:length(orientation)
+        for i = 1:length(intensity)
+            % load the data
+            name = sprintf('%s\\%s AGSICI P1 S%s %s %s.mat', folder_output, prefix, subj, orientation{o}, intensity{i});
+            load(name)
+
+            % append individual data
+            data_muscles_trials(o, i, s, 1:size(data, 1), :, :) = squeeze(data);
+
+            % calculate subject average
+            data_muscles(o, i, s, :, :) = squeeze(mean(data, 1));
+
+            % calculate artifact gfp
+            data_muscles_gfp(o, i, s, :) = std(squeeze(data_muscles(o, i, s, electrodes, :)), 1);
+        end
+    end
+end
+fprintf('done.\n')
+save(output_file, 'data_muscles_trials', '-append');
+save(output_file, 'data_muscles', '-append');
+save(output_file, 'data_muscles_gfp', '-append');
+
+data_muscles_gfp(:, :, [1:15, 17:19], :) = data_muscles_gfp;
+data_muscles_gfp(:, :, 16, :) = 0;
+counter = 1; 
+for a = 1:size(AGSICI_muscle_activity.contraction.data, 1)
+    for b = 1:size(AGSICI_muscle_activity.contraction.data, 2)
+        data_muscles(counter, :, 16, :, :) = AGSICI_muscle_activity.contraction.data(a, b, :, 16, :, 1:700);   
+        data_muscles_gfp(counter, :, 16, :) = AGSICI_muscle_activity.contraction.GFP(a, b, :, 16, 1:700);
+        counter = counter + 1;
+    end
+end
+
+% identify TOI limits
+x_start = (toi(1) + 50)/x_step;
+x_end = (toi(2) + 50)/x_step;
+
+% export artifact GFP values in R-compatible table - subject mean values
+AGSICI_P1_muscles_mean = table;
+row_counter = height(AGSICI_P1_muscles_mean) + 1;
+for s = 1:length(subjects) 
+    for o = 1:length(orientation)  
+        for i = 1:length(intensity)
+            % fill mean values
+            AGSICI_P1_muscles_mean.subject(row_counter) = s;
+            AGSICI_P1_muscles_mean.subject_ID(row_counter) = subjects(s);
+            AGSICI_P1_muscles_mean.orientation{row_counter} = orientation(o);
+            AGSICI_P1_muscles_mean.intensity(row_counter) = str2num(intensity{i});
+            AGSICI_P1_muscles_mean.gfp(row_counter) = mean(data_muscles_gfp(o, :, s, x_start:x_end), [2, 4]);
+
+            % update the counter
+            row_counter = row_counter + 1;
+        end
+    end
+end
+writetable(AGSICI_P1_muscles_mean, [folder_results '\AGSICI_P1_muscles_mean.csv'])
+
+% export values in R-compatible table - trial values
+AGSICI_P1_muscles_trials = table;
+row_counter = height(AGSICI_P1_muscles_trials) + 1;
+for s = 1:length(subjects) 
+    for o = 1:length(orientation)  
+        for i = 1:length(intensity)
+            % determine number of trials in the category
+            for e = 1:size(data_muscles_trials, 4)
+                if sum(data_muscles_trials(o, i, s, e, 1, :)) == 0
+                    idx(e) = false;
+                else
+                    idx(e) = true;
+                end
+            end
+            
+            for t = 1:sum(idx)
+                % calculate GFP 
+                gfp = std(squeeze(data_muscles_trials(o, i, s, t, electrodes, :)), 1);
+                gfp = mean(gfp(x_start:x_end));
+
+                % fill values
+                AGSICI_P1_muscles_trials.subject(row_counter) = s;
+                AGSICI_P1_muscles_trials.subject_ID(row_counter) = subjects(s);
+                AGSICI_P1_muscles_trials.orientation{row_counter} = orientation(o);
+                AGSICI_P1_muscles_trials.intensity(row_counter) = str2num(intensity{i});
+                AGSICI_P1_muscles_trials.trial(row_counter) = t;
+                AGSICI_P1_muscles_trials.gfp(row_counter) = gfp;
+
+                % update the counter
+                row_counter = row_counter + 1;
+            end
+        end
+    end
+end
+writetable(AGSICI_P1_muscles_trials, [folder_results '\AGSICI_P1_muscles_trials.csv'])
+
+clear session e f o s t 
 
 %% functions
 function export_EEGLAB(lwdata, filename, subj)
