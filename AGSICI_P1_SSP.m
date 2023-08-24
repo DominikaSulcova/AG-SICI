@@ -993,8 +993,11 @@ save(output_file, 'data_muscles_trials', '-append');
 save(output_file, 'data_muscles', '-append');
 save(output_file, 'data_muscles_gfp', '-append');
 
-data_muscles_gfp(:, :, [1:15, 17:19], :) = data_muscles_gfp;
-data_muscles_gfp(:, :, 16, :) = 0;
+% fill in data for subject 17
+data_temp = data_muscles(:, :, [16:18], :, :);
+data_muscles(:, :, [16:18], :, :) = [];
+data_muscles(:, :, [17:19], :, :) = data_temp;
+clear data_temp
 counter = 1; 
 for a = 1:size(AGSICI_muscle_activity.contraction.data, 1)
     for b = 1:size(AGSICI_muscle_activity.contraction.data, 2)
@@ -1003,6 +1006,7 @@ for a = 1:size(AGSICI_muscle_activity.contraction.data, 1)
         counter = counter + 1;
     end
 end
+clear a b counter AGSICI_muscle_activity
 
 % identify TOI limits
 x_start = (toi(1) + 50)/x_step;

@@ -223,6 +223,18 @@ clear p i
 % prepare x axis
 x = x_lim(1):x_step:x_lim(2);
 
+%% plot mean TEP
+data_visual = squeeze(mean(data_mean(:, :, 1:32, :), [1,2]));
+fig = plot_TEP(figure_counter, x, data_visual, [-4 4])
+
+% name and save figure
+fig_name = 'TEP_all';
+savefig([folder_figures '\' fig_name '.fig'])
+saveas(fig, [folder_figures '\' fig_name '.svg'], 'svg')
+
+% update figure counter
+figure_counter = figure_counter + 1 ;    
+%%
 % identify channel to highlight
 for e = 1:length(electrodes)
     if strcmp(electrodes{e}, channel)
@@ -331,7 +343,7 @@ for p = 1:length(position)
     figure_counter = figure_counter + 1;
     
     % plot GFP
-    fig = plot_GFP(figure_counter, x, gfp, y_lim{2}, 'colour', colours((p-1)*length(intensity) + 2, :));
+    fig = plot_GFP(figure_counter, x, gfp, y_lim{2}, colours((p-1)*length(intensity) + 2, :));
 
     % name & save
     fig_name = sprintf('AGSICI_TEP_GFP_%s', position{p});
@@ -351,6 +363,40 @@ comparison = {data_MS.strF1, data_MS.strF2, [data_MS.strF1 '_' data_MS.strF2]};
 
 % preapre x axis
 x = x_lim(1):x_step:x_lim(2);
+
+% extract TANOVA clusters
+for c = 1:numel(comparison)
+    % get the data
+    data = squeeze(data_MS.PTanova(1, 1 + c, :, 1));
+
+    % identify clusters p <= 0.05
+    signif = find(data <= 0.05);
+    if ~isempty(signif)
+        signif_cluster_idx = find(diff(signif)>1); 
+        TANOVA_clusters(c).p05{1} = [signif(1) * x_step - 50, signif(signif_cluster_idx(1)) * x_step - 50];
+        for a = 1:numel(signif_cluster_idx)
+            if a == numel(signif_cluster_idx)
+                TANOVA_clusters(c).p05{a+1} = [signif(signif_cluster_idx(a) + 1) * x_step - 50, signif(end) * x_step - 50];
+            else
+                TANOVA_clusters(c).p05{a+1} = [signif(signif_cluster_idx(a) + 1) * x_step - 50, signif(signif_cluster_idx(a + 1)) * x_step - 50];
+            end
+        end
+    end
+
+    % identify clusters p <= 0.01
+    signif = find(data <= 0.01);
+    if ~isempty(signif)
+        signif_cluster_idx = find(diff(signif)>1); 
+        TANOVA_clusters(c).p01{1} = [signif(1) * x_step - 50, signif(signif_cluster_idx(1)) * x_step - 50];
+        for a = 1:numel(signif_cluster_idx)
+            if a == numel(signif_cluster_idx)
+                TANOVA_clusters(c).p01{a+1} = [signif(signif_cluster_idx(a) + 1) * x_step - 50, signif(end) * x_step - 50];
+            else
+                TANOVA_clusters(c).p01{a+1} = [signif(signif_cluster_idx(a) + 1) * x_step - 50, signif(signif_cluster_idx(a + 1)) * x_step - 50];
+            end
+        end
+    end
+end
 
 % plot TANOVA results for all comparisons
 for c = 1:numel(comparison)
@@ -386,7 +432,7 @@ for c = 1:numel(comparison)
     % update figure counter
     figure_counter = figure_counter + 1 ;       
 end
-clear comparison c data_visual fig fig_name x x_start x_end x_lim x_step
+clear comparison c a data signif signif_cluster_idx data_visual fig fig_name x x_start x_end x_lim x_step
 
 %% 5) GFP P-VALUE + EV
 % ----- section input -----
@@ -397,21 +443,61 @@ x_step = 0.5;
 % identify factor
 switch factor
     case 'orientation'
-        factor_n = 2;
+        n = 1;
     case 'intensity'
-        factor_n = 3;
+        n = 2;
     case 'interaction'
-        factor_n = 4;
+        n = 3;
 end
 
+% ----- extract TANOVA clusters -----
+% get the data
+data = squeeze(data_MS.GFPPTanova(1, 1 + n, :, 1));
+
+% identify clusters p <= 0.05
+signif = find(data <= 0.05);
+if ~isempty(signif)
+    signif_cluster_idx = find(diff(signif)>1);
+    if ~isempty(signif_cluster_idx)
+        TANOVA_GFP_clusters(n).p05{1} = [signif(1) * x_step - 50, signif(signif_cluster_idx(1)) * x_step - 50];
+        for a = 1:numel(signif_cluster_idx)
+            if a == numel(signif_cluster_idx)
+                TANOVA_GFP_clusters(n).p05{a+1} = [signif(signif_cluster_idx(a) + 1) * x_step - 50, signif(end) * x_step - 50];
+            else
+                TANOVA_GFP_clusters(n).p05{a+1} = [signif(signif_cluster_idx(a) + 1) * x_step - 50, signif(signif_cluster_idx(a + 1)) * x_step - 50];
+            end
+        end
+    else
+        TANOVA_GFP_clusters(n).p05{1} = [signif(1) * x_step - 50, signif(end) * x_step - 50];
+    end
+end
+
+% identify clusters p <= 0.01
+signif = find(data <= 0.01);
+if ~isempty(signif)
+    signif_cluster_idx = find(diff(signif)>1); 
+    if ~isempty(signif_cluster_idx)
+        TANOVA_GFP_clusters(n).p01{1} = [signif(1) * x_step - 50, signif(signif_cluster_idx(1)) * x_step - 50];
+        for a = 1:numel(signif_cluster_idx)
+            if a == numel(signif_cluster_idx)
+                TANOVA_GFP_clusters(n).p01{a+1} = [signif(signif_cluster_idx(a) + 1) * x_step - 50, signif(end) * x_step - 50];
+            else
+                TANOVA_GFP_clusters(n).p01{a+1} = [signif(signif_cluster_idx(a) + 1) * x_step - 50, signif(signif_cluster_idx(a + 1)) * x_step - 50];
+            end
+        end
+    else
+        TANOVA_GFP_clusters(n).p01{1} = [signif(1) * x_step - 50, signif(end) * x_step - 50];
+    end
+end
+
+% ----- p value -----
 % preapre x axis
 x = x_lim(1):x_step:x_lim(2);
 
-% ----- p value -----
 % load data
 x_start = (x_lim(1) + 50)/x_step;
 x_end = (x_lim(2) + 50)/x_step;
-data_visual = squeeze(data_MS.GFPPTanova(1, factor_n, x_start:x_end, 1))';      
+data_visual = squeeze(data_MS.GFPPTanova(1, 1 + n, x_start:x_end, 1))';      
 
 % plot the p-value timecourse
 fig = plot_p(x, data_visual, figure_counter);                   
@@ -426,7 +512,7 @@ figure_counter = figure_counter + 1 ;
 
 % ----- explained variance -----
 % load data
-data_visual = squeeze(data_MS.GFPExpVar{1}(1, factor_n, x_start:x_end));    
+data_visual = squeeze(data_MS.GFPExpVar{1}(1, 1 + n, x_start:x_end));    
 
 % plot EV timecourse
 fig = plot_EV(x, data_visual, figure_counter);
@@ -439,7 +525,57 @@ saveas(fig, [folder_figures '\' fig_name '.svg'], 'svg')
 % update figure counter
 figure_counter = figure_counter + 1 ;
 
-clear factor factor_n data_visual fig x_lim x_step x x_start x_end fig fig_name
+clear factor n a data signif signif_cluster_idx data_visual fig x_lim x_step x x_start x_end fig fig_name
+
+%% EXPORT GFP VALUES FOR R
+% ----- section input -----
+factor = {'orientation' 'interaction'};         
+toi = {[31.5, 94.5], [46, 53]};
+x_step = 0.5;
+% -------------------------
+
+% create a table
+GFP_table = table;
+
+% fill it in a long format
+counter = 1;
+for p = 1:length(position)
+    for i = 1:length(intensity)
+        for s = 1:length(subject)
+            % fill in the condition details
+            GFP_table.subject(counter) = subject(s);
+            GFP_table.subject_n(counter) = s;
+            GFP_table.position(counter) = p;
+            GFP_table.intensity(counter) = i;
+
+            % fill in mean GFP over each toi
+            for f = 1:length(factor)
+                % identify TOI limits
+                x_start = (toi{f}(1) + 50)/x_step;
+                x_end = (toi{f}(2) + 50)/x_step;
+
+                % calculate mean GFP
+                GFP_mean = mean(std(squeeze(data_individual(p, i, s, :, x_start:x_end)), 1));
+
+                % fill the table
+                statement = ['GFP_table.' factor{f} '(counter) = GFP_mean;'];
+                eval(statement)
+            end
+            
+            % update the counter
+            counter = counter + 1;
+        end
+    end
+end
+
+% append muscular artifact data
+GFP_table = addvars(GFP_table, AGSICI_muscles_summary.data.contraction, 'NewVariableNames', 'contraction');
+AGSICI_GFP_summary.data = GFP_table;            
+
+% write the table to .csv
+writetable(GFP_table, [folder_results '\AGSICI_P1_GFP_mean.csv'])
+
+clear factor toi x_step counter p i s f x_start x_end GFP_mean statement
 
 %% 6) GFP BOXPLOT
 % ----- section input -----
@@ -525,7 +661,6 @@ x_start = (toi(1) + 50)/x_step;
 x_end = (toi(2) + 50)/x_step;
 
 % create output structure
-AGSICI_GFP_summary = struct;
 for p = 1:length(position)
     for i = 1:length(intensity)
         % calculate individual GFP per condition (exclude target channel)
@@ -696,7 +831,7 @@ saveas(fig, [folder_figures '\' fig_name '.svg'], 'svg')
 % update the counter
 figure_counter = figure_counter + 1;  
 
-%% boxplot without outliers (average across intensities)
+% boxplot without outliers (average across intensities)
 idx = find(~ismember(1:size(data_muscles_gfp, 3), outliers));
 fig = plot_box(figure_counter, data_visual(idx, :), colours([2, 5, 8, 11], :));
 
@@ -964,9 +1099,6 @@ for p = 1:length(position)
         savelw(data, header, name) 
     end
 end
-
-% plot butterfly plot of a representative subject
-
         
 clear channel interpolation x_lim x_step y_lim data_visual x e channel_n fig fig_name
 
@@ -976,9 +1108,9 @@ orientation = {'along' 'across'};
 toi = [3 10];
 x_lim = [-5, 30];
 x_step = 0.5;
-y_lim = [-10, 350];
+y_lim = [-10, 800];
 categories = 4;
-outliers = [4, 11];
+% outliers = [4, 11];
 % -------------------------
 % check for colour scheme
 answer = questdlg('Do you want to choose a new colour scheme?', 'Colour scheme', 'YES', 'NO', 'NO'); 
@@ -1003,15 +1135,17 @@ clear answer a c
 % if exist('muscles_table')~=1
 %     load(output_file, 'AGSICI_muscles_summary');
 % end
-% 
-% % deal with potential outliers
-% muscles_table = AGSICI_muscles_summary.data(~ismember(AGSICI_muscles_summary.data.subject_n, outliers), :);
-% AGSICI_muscles_summary.data_WO = muscles_table;
+
+% deal with potential outliers
+if exist('outliers') > 0
+    muscles_table_WO = AGSICI_muscles_summary.data(~ismember(AGSICI_muscles_summary.data.subject_n, outliers), :);
+    AGSICI_muscles_summary.data_WO = muscles_table_WO;
+end
 
 % loop through orientations
 for o = 1:length(orientation)    
     % subset and sort by contraction size
-    muscles_table = AGSICI_muscles_summary.data_WO(AGSICI_muscles_summary.data_WO.position == (o - 1)*2 + 1 | ...
+    muscles_table = AGSICI_muscles_summary.data(AGSICI_muscles_summary.data_WO.position == (o - 1)*2 + 1 | ...
         AGSICI_muscles_summary.data_WO.position == (o - 1)*2 + 2, :);
     muscles_table = sortrows(muscles_table, 5); 
     for c = 1:categories
@@ -1061,7 +1195,7 @@ for o = 1:length(orientation)
             data(a, :, 1, 1, 1, :) = data_individual(muscles_subset.position(a), muscles_subset.intensity(a), muscles_subset.subject_n(a), :, :);
         end
         load([folder_git '\header_example.mat'])
-        name = sprintf('merged_subj AGSICI %s muscles TEP WO %s cat%d', study, orientation{o}, c);
+        name = sprintf('merged_subj AGSICI %s muscles WO TEP %s cat%d', study, orientation{o}, c);
         savelw(data, header, name) 
 
         % prepare GFP for visualization
@@ -1077,12 +1211,64 @@ for o = 1:length(orientation)
             'toi', toi, 'colour', colours_muscles((o-1)*categories + c, :))
 
         % name and save figure
-        fig_name = sprintf('MUSCLES_contraction_WO_%s_cat%d', orientation{o}, c);
+        fig_name = sprintf('MUSCLES_WO_contraction_%s_cat%d', orientation{o}, c);
         savefig([folder_figures '\' fig_name '.fig'])
         saveas(fig, [folder_figures '\' fig_name '.svg'], 'svg')
 
         % update the counter
         figure_counter = figure_counter + 1;    
+    end
+end
+
+% save normalized TEP data for letswave
+for o = 1:length(orientation) 
+    % subset and sort by contraction size
+    muscles_table = AGSICI_muscles_summary.data(AGSICI_muscles_summary.data_WO.position == (o - 1)*2 + 1 | ...
+        AGSICI_muscles_summary.data_WO.position == (o - 1)*2 + 2, :);
+    muscles_table = sortrows(muscles_table, 5); 
+    for c = 1:categories
+        muscles_table.category((c-1)*floor(height(muscles_table)/categories) + [1:floor(height(muscles_table)/categories)]) = c;
+    end
+    if any(muscles_table.category == 0)
+        muscles_table.category(find(muscles_table.category == 0)) = 4;
+    end
+
+    % loop through categories
+    for c = 1:categories
+        % subset the data
+        muscles_subset = muscles_table(muscles_table.category == c, 2:5);
+
+        % normalize by GFP
+        for a = 1:height(muscles_subset)
+            TEP_raw = squeeze(data_individual(muscles_subset.position(a), muscles_subset.intensity(a), muscles_subset.subject_n(a), :, :));
+            GFP = std(TEP_raw, 1);
+            for e = 1:size(TEP_raw, 1)
+                for t = 1:size(TEP_raw, 2)
+                    TEP_norm(e, t) = TEP_raw(e, t)/GFP(t);
+                end
+            end
+            data(a, :, 1, 1, 1, :) = TEP_norm;
+        end
+
+        % save for letswave
+        load([folder_git '\header_example.mat'])
+        name = sprintf('merged_subj AGSICI %s muscles TEP NORMALIZED %s cat%d', study, orientation{o}, c);
+        savelw(data, header, name) 
+    end
+end
+
+% save merged datasets
+for p = 1:length(position)
+    data = [];
+    data(:, :, 1, 1, 1, :) = squeeze(mean(data_individual(p, :, :, :, :), 2));
+    name = sprintf('merged_subj AGSICI %s TEP %s', study, position{p});
+    savelw(data, header, name) 
+
+    for i = 1:length(intensity)
+        data = [];
+        data(:, :, 1, 1, 1, :) = squeeze(data_individual(p, i, :, :, :));
+        name = sprintf('merged_subj AGSICI %s TEP %s %s', study, position{p}, intensity{i});
+        savelw(data, header, name) 
     end
 end
 
@@ -1093,11 +1279,12 @@ clear orientation toi x_lim y_lim x_step x_start x_end p i s o counter categorie
 
 %% 15) MUSCLES - TEP GFP
 % ----- section input -----
+TEP_peaks = {'P25' 'N45'};
 toi_TEP = {[15 33], [33 60]};
 toi_artifact = [3 10];
 categories = 4;
 x_step = 0.5;
-x_start = -50;
+x_0 = -50;
 % -------------------------
 % check for colour scheme
 answer = questdlg('Do you want to choose a new colour scheme?', 'Colour scheme', 'YES', 'NO', 'NO'); 
@@ -1119,8 +1306,8 @@ end
 clear answer a c
 
 % identify artifact TOI limits
-x_start = (toi_artifact(1) - x_start)/x_step;
-x_end = (toi_artifact(2) - x_start)/x_step;
+x_start = (toi_artifact(1) - x_0)/x_step;
+x_end = (toi_artifact(2) - x_0)/x_step;
 
 % create a table with muscle artifact sizes
 muscles_table = table;
@@ -1141,6 +1328,7 @@ for p = 1:length(position)
     end
 end
 AGSICI_muscles_summary.data = muscles_table;
+save(output_file, 'AGSICI_muscles_summary', '-append')
 
 % sort by contraction size
 muscles_table = sortrows(muscles_table, 5); 
@@ -1151,7 +1339,7 @@ if any(muscles_table.category == 0)
     muscles_table.category(find(muscles_table.category == 0)) = 4;
 end
 
-% loop through categories
+% subset data per category
 for c = 1:categories
     % subset the data
     muscles_subset = muscles_table(muscles_table.category == c, 2:5);
@@ -1199,34 +1387,199 @@ for c = 1:categories
 end
 
 % calculate TEP GFP for each category
+for c = 1:categories
+    for t = 1:length(toi_TEP)
+        % calculate limits of the TOI
+        x_start = (toi_TEP{t}(1) - x_0)/x_step;
+        x_end = (toi_TEP{t}(2) - x_0)/x_step;
 
+        % subset data
+        statement = sprintf('data_temp = squeeze(AGSICI_muscles_summary.data_TEP.cat%d);', c);
+        eval(statement)
+
+        % calculate GFP for each entry in the group
+        for e = 1:size(data_temp, 1)
+            gfp_temp = std(squeeze(data_temp(e, :, :)), 1);
+            data_TEP_gfp(c, t, e) = mean(gfp_temp(x_start:x_end));
+        end
+    end
+end
+clear a c categories counter colours_muscles data_temp data_TEP_gfp e gfp_temp name p s statement t TEP_peaks toi_TEP toi_artifact x_0 x_end x_start x_step
+
+%% muscle contraction X TEP GFP - correlation  
+% ----- section input -----
+TEP_peaks = {'P25' 'N45'};
+toi_TEP = {[15 33], [33 60]};
+toi_artifact = [3 10];
+x_step = 0.5;
+x_0 = -50;
+% -------------------------
+% check for colour scheme
+answer = questdlg('Do you want to choose a new colour scheme?', 'Colour scheme', 'YES', 'NO', 'NO'); 
+switch answer
+    case 'YES'
+        for a = 1:2
+            for c = 1:categories
+                colours_muscles((a-1)*categories + c, :) = uisetcolor; 
+            end
+        end
+        save([folder_git '\AGSICI_' study 'colours_muscles.mat'], 'colours_muscles')
+    case 'NO'
+        if exist([folder_git '\AGSICI_' study '_colours_muscles.mat']) > 0
+            load([folder_git '\AGSICI_' study '_colours_muscles.mat'])
+        else
+            disp('No colour scheme found in git directory!')    
+        end
+end
+clear answer a c
+
+% identify artifact TOI limits
+x_start = (toi_artifact(1) - x_0)/x_step;
+x_end = (toi_artifact(2) - x_0)/x_step;
+
+% create a table with muscle artifact sizes
+muscles_table = table;
+counter = 1;
+for p = 1:length(position)
+    for i = 1:length(intensity)
+        for s = 1:size(data_muscles_gfp, 3) 
+            % fill in the line
+            muscles_table.subject(counter) = subject(s);
+            muscles_table.subject_n(counter) = s;
+            muscles_table.position(counter) = p;
+            muscles_table.intensity(counter) = i;
+            muscles_table.contraction(counter) = mean(data_muscles_gfp(p, i, s, x_start:x_end));
+            
+            % update the counter
+            counter = counter + 1;
+        end
+    end
+end
+AGSICI_muscles_summary.data = muscles_table;
+
+% calculate GFP of TEP peaks
+for p = 1:length(position)
+    for i = 1:length(intensity)
+        for s = 1:length(subject)
+            % choose TEP data
+            data_temp = squeeze(data_individual(p, i, s, :, :));
+
+            % calculate GFP for all TEP peaks
+            for t = 1:length(toi_TEP)
+                % calculate limits of the TOI
+                x_start = (toi_TEP{t}(1) - x_0)/x_step;
+                x_end = (toi_TEP{t}(2) - x_0)/x_step;
+
+                % calculate GFP over the TOI
+                gfp_temp = std(data_temp, 1);
+                data_TEP_GFP(p, i, s, t) = mean(gfp_temp(x_start:x_end));
+            end
+        end
+    end
+end
+
+% append TEP data to the table
+counter = 1;
+for p = 1:length(position)
+    for i = 1:length(intensity)
+        for s = 1:length(subject) 
+            % fill in the line
+            muscles_table.TEP_P25(counter) = data_TEP_GFP(p, i, s, 1);
+            muscles_table.TEP_N45(counter) = data_TEP_GFP(p, i, s, 2);
+            
+            % update the counter
+            counter = counter + 1;
+        end
+    end
+end
+AGSICI_muscles_summary.data = muscles_table;
+
+% plot correlation between muscle contraction size and TEP GFP
+stats_corr = table;
+stats_coefs = struct;
+for t = 1:length(toi_TEP)
+    % prepare x --> TEP GFP
+    counter = 1;
+    for p = 1:length(position)
+        for i = 1:length(intensity) 
+            for s = 1:length(subject)
+                x_corr(counter) = data_TEP_GFP(p, i, s, t);
+                counter = counter + 1;
+            end
+        end
+    end
+
+    % prepare y --> musclular contration
+    y_corr = double(muscles_table.contraction');
+    data_corr(:, 1) = x_corr,
+    data_corr(:, 2) = y_corr;
+    
+    % prepare colours
+    for a = 1:length(x_corr)/2
+    marker_col(a, :) = [1.0000    0.2706    0.2706];
+    end
+    for b = length(x_corr)/2+1:length(x_corr)
+    marker_col(b, :) = [0    0.4471    0.7412];
+    end
+    
+    % preliminary plot
+    figure(figure_counter)
+    scatter(data_corr(:, 1), data_corr(:, 2))
+    xlabel(TEP_peaks{t})
+    ylabel('muscle')
+    figure_counter = figure_counter + 1;
+    
+    % rank the data
+    [~, x_ranked]  = ismember(x_corr, unique(x_corr));
+    [~, y_ranked]  = ismember(y_corr, unique(y_corr));
+    data_corr(:, 1) = x_ranked,
+    data_corr(:, 2) = y_ranked;
+    
+    % preliminary plot 2
+    figure(figure_counter)
+    scatter(data_corr(:, 1), data_corr(:, 2))
+    xlabel(TEP_peaks{t})
+    ylabel('muscle')
+    figure_counter = figure_counter + 1;
+
+    % plot GFP per condition, identify outliers
+    fig = plot_box(figure_counter, data_visual, colours([3, 6, 9, 12], :));
+    title(sprintf('GFP of TEP peak %s grouped by increasing'))
+
+    % name and save figure
+    fig_name = sprintf('MUSCLES_outliers');
+    savefig([folder_figures '\' fig_name '.fig'])
+    saveas(fig, [folder_figures '\' fig_name '.svg'], 'svg')
+end
+
+% save(output_file, 'AGSICI_muscle_summary', 'data_TEP_GFP', '-append');
+% clear counter colours_muscles data_temp data_TEP_gfp e gfp_temp name p s statement t TEP_peaks toi_TEP toi_artifact x_0 x_end x_start x_step
 
 %% functions
 function fig = plot_TEP(figure_counter, x, data_visual, y_lim, varargin)
+    % set the defaults
+    channel_n = [];
+    colour = [0.65 0.65 0.65];
+    int = [-5 10];
+
     % deal with optional arguments
     if ~isempty(varargin)
         % channel to highlight
         a = find(strcmpi(varargin, 'channel'));
         if ~isempty(a)
             channel_n = varargin{a + 1};
-        else
-            channel_n = [];
         end
         
         % line colour
         b = find(strcmpi(varargin, 'colour'));
         if ~isempty(b)
             colour = varargin{b + 1};
-        else
-            colour = [0.65 0.65 0.65];
         end
         
         % interpolated interval
         c = find(strcmpi(varargin, 'interpolation'));
         if ~isempty(c)
             int = varargin{c + 1};
-        else
-            int = [-5 10];
         end
     end    
     
@@ -1794,7 +2147,7 @@ function fig = plot_muscle(figure_counter, x, y, SEM, x_info, y_info, varargin)
     set(gca, 'FontSize', 16) 
     set(gca, 'Layer', 'Top')  
 end
-function [fig, varargout] = plot_box(figure_counter, data_visual, colour)
+function fig = plot_box(figure_counter, data_visual, colour)
     % launch the figure
     fig = figure(figure_counter); 
     ax = gca;       

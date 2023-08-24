@@ -1,0 +1,313 @@
+---
+title: "AGSIci - muscle contraction analysis"
+author: "Dominika Sulcova"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_chunk$set(echo = TRUE)
+opts_chunk$set(tidy.opts=list(width.cutoff=50),tidy=TRUE)
+```
+
+```{r libraries,message=FALSE,warning=FALSE}
+library(tidyverse)
+library(readxl)
+library(ggeffects)
+library(lmerTest)
+library(ggplot2)
+library(readr)
+library(emmeans) 
+
+rm(list=ls())
+setwd('C:/Users/uzivatel/UCL/O365G-NOCIONS - dsulcova/AG-SICI/Results')
+```
+
+```{r functions,message=FALSE,warning=FALSE}
+check_model<-function(lmm,data){
+  plot(fitted(lmm),residuals(lmm))
+  qqnorm(residuals(lmm))
+  qqline(residuals(lmm))
+  ggplot(data.frame(cook=cooks.distance(lmm),id = data$subject_ID),
+         aes(x=cook,y=id)) +
+    geom_point() +
+    theme_bw()
+}
+
+col_palette = c('firebrick1', 'cornflowerblue', 'gold2', 'forestgreen')
+```
+
+# Muscular contraction - single trial analysis
+
+## Import the data
+
+```{r,message=FALSE,warning=FALSE}
+data <- read_delim("AGSICI_P1_muscles_trials.csv", col_names = TRUE, delim = ',') %>% 
+  select(subject_ID, orientation, intensity, trial, gfp) %>% 
+  mutate(subject_ID = factor(subject_ID)) %>% 
+  mutate(orientation = factor(orientation, levels = c("along_normal", "along_reversed", "across_normal", "across_reversed"), ordered = TRUE)) %>% 
+  mutate(intensity = factor(intensity, ordered = TRUE)) 
+
+summary(data)
+```
+
+
+## Initial data visualization for sanity check
+
+Let's start with a few visualizations of the data.
+
+One dot per observation:
+
+```{r,echo=FALSE,message=FALSE}
+data %>%
+  ggplot(aes(x = as.character(orientation), y = gfp, 
+             color = orientation, group = interaction(as.factor(subject_ID), orientation))) +  
+  geom_jitter(height = 0, alpha = .1) +
+  scale_color_manual(values = col_palette) +
+  theme_classic()
+```
+Participant average trajectories:
+
+```{r,echo=FALSE,message=FALSE}
+data %>%
+  group_by(subject_ID, orientation) %>%
+  summarise(m = mean(gfp)) %>%
+  ggplot(aes(x = as.character(orientation), y = m, color = subject_ID, group = subject_ID))+  
+  geom_line()+
+  theme_classic()
+```
+
+## Model the data
+
+```{r}
+mm1 <- lmer(gfp ~ orientation * intensity + (1|subject_ID), data = data)
+check_model(mm1, data)
+```
+
+The residuals are clearly not gaussian, let's try to transform:
+
+```{r}
+mm2 <-lmer(log(gfp) ~ orientation * intensity + (1|subject_ID), data = data)
+check_model(mm2, data)
+```
+
+let's see what happens if we square root the data
+
+```{r}
+mm3 <-lmer(sqrt(gfp) ~ orientation * intensity + (1|subject_ID), data = data)
+check_model(mm3, data)
+```
+
+That's not better, rather worse... Leet's see, what happens if I remove subject 12
+
+```{r}
+mm4 <-lmer(log(gfp) ~ orientation * intensity + (1|subject_ID), data = filter(data, subject_ID != 12))
+check_model(mm4, filter(data, subject_ID != 12))
+```
+
+## Interpretation of the model
+
+Let's keep all the subjects and log-transform the data --> mm2. 
+First let's have a look at the anova output:
+
+```{r}
+anova(mm2)
+```
+
+```{r,message=F}
+data_predicted <- ggpredict(mm2, terms = 'orientation')
+plot(data_predicted, connect.lines = TRUE) +
+  scale_color_manual(values = col_palette)
+
+
+g<-plot(data,connect.lines=TRUE,add.data = T)+
+  scale_color_manual(values=c(col_palette[1], col_palette[3]))
+g$layers[[1]]$aes_params$alpha=.1
+g$layers[[1]]$aes_params$size=.2
+plot(g)
+```
+
+Let's check post hoc comparisons:
+
+```{r}
+emm <- emmeans(mm2, specs = ~ orientation * intensity)
+emm
+pairwise <- pairs(emm)
+print(pairwise)
+```
+
+
+```{r}
+# pair-wise ad-hoc tests
+hypothesis_test(mm2, terms = c('orientation', 'intensity'), test = NULL)
+# https://strengejacke.github.io/ggeffects/articles/introduction_comparisons.html
+```
+
+# GFP - mean values analysis
+
+## Import the data
+```{r,message=FALSE,warning=FALSE}
+data_orientation <- read_delim("AGSICI_P1_GFP_mean.csv", col_names = TRUE, delim = ',') %>% 
+  group_by(subject, position) %>%
+  summarize(orientation = mean(orientation), 
+            contraction = mean(contraction)) 
+  
+data_orientation <- data_orientation %>% 
+  rename(subject_ID = subject) %>% 
+  mutate(subject_ID = factor(subject_ID)) %>% 
+  mutate(position = recode(position, '1' = 'along_normal', '2' = 'along_reversed', '3' = 'across_normal', '4' = 'across_reversed')) %>% 
+  mutate(position = factor(position, ordered = TRUE)) %>% 
+  rename(gfp = orientation) 
+
+summary(data_orientation)
+
+data_interaction <- read_delim("AGSICI_P1_GFP_mean.csv", col_names = TRUE, delim = ',') %>% 
+  select(subject, position, intensity, interaction, contraction) %>% 
+  rename(subject_ID = subject) %>% 
+  mutate(subject_ID = factor(subject_ID)) %>% 
+  mutate(position = recode(position, '1' = 'along_normal', '2' = 'along_reversed', '3' = 'across_normal', '4' = 'across_reversed')) %>% 
+  mutate(position = factor(position, ordered = TRUE)) %>% 
+  mutate(intensity = recode(intensity, '1' = 100, '2' = 120, '3' = 140)) %>% 
+  mutate(intensity = factor(intensity, ordered = TRUE)) %>% 
+  rename(gfp = interaction) 
+
+summary(data_interaction)
+```
+
+## ORIENTATION: Initial data visualization
+
+```{r,echo=FALSE,message=FALSE}
+data_orientation %>%
+  ggplot(aes(x = as.character(position), y = gfp, 
+             color = position, group = interaction(subject_ID, position))) +  
+  geom_jitter(height = 0) +
+  scale_color_manual(values = col_palette) +
+  theme_classic()
+```
+
+Participant average trajectories:
+
+```{r,echo=FALSE,message=FALSE}
+data_orientation %>%
+  ggplot(aes(x = as.character(position), y = gfp, color = subject_ID, group = subject_ID))+  
+  geom_line()+
+  theme_classic()
+```
+
+## ORIENTATION: Model the data
+
+```{r}
+mm1 <- lmer(gfp ~ position + (1|subject_ID), data = data_orientation)
+check_model(mm1, data_orientation)
+```
+
+Let's try to log-transform:
+
+```{r}
+mm2 <-lmer(log(gfp) ~ position + (1|subject_ID), data = data_orientation)
+check_model(mm2, data_orientation)
+```
+
+A bit better... Now let's prepare a model where we add the contraction as a covariate:
+
+```{r}
+mm3 <-lmer(log(gfp) ~ position * contraction + (1|subject_ID), data = data_orientation)
+```
+
+## ORIENTATION: Interpretation of the model
+
+Let's keep all the subjects and log-transform the data. 
+First let's have a look at the anova output without the covariate:
+
+```{r}
+anova(mm2)
+```
+
+Now let's see how much influence does the covariate have:
+
+```{r}
+anova(mm3)
+```
+Clearly the size of muscular contraction can explain some of the variance but not all of it, at least not when we average across intensities.
+
+Let's visually check marginal effects: 
+
+```{r,message=F}
+data_predicted <- ggpredict(mm2, terms = 'position')
+plot(data_predicted, connect.lines = FALSE, add.data = TRUE) 
+```
+
+Let's check post hoc comparisons:
+
+```{r}
+emm <- emmeans(mm2, specs = ~ position)
+pairwise <- pairs(emm)
+print(pairwise)
+```
+
+## INTERACTION: Initial data visualization
+
+```{r,echo=FALSE,message=FALSE}
+data_interaction %>%
+  ggplot(aes(x = as.character(position), y = gfp, color = intensity)) +  
+  geom_jitter(height = 0, alpha = .25)+
+  scale_color_manual(values = col_palette[c(1, 2, 4)], labels = c("100 %rMT", "120 %rMT", "140 %rMT")) +
+  geom_jitter(height = 0) +
+  theme_classic()
+```
+
+## ORIENTATION: Model the data
+
+```{r}
+mm1 <- lmer(gfp ~ position * intensity + (1|subject_ID), data = data_interaction)
+check_model(mm1, data_interaction)
+```
+
+Let's try to log-transform:
+
+```{r}
+mm2 <-lmer(log(gfp) ~ position * intensity + (1|subject_ID), data = data_interaction)
+check_model(mm2, data_interaction)
+```
+
+Much better... Now let's prepare a model where we add the contraction as a covariate:
+
+```{r}
+mm3 <-lmer(log(gfp) ~ position * intensity * contraction + (1|subject_ID), data = data_interaction)
+```
+
+## ORIENTATION: Interpretation of the model
+
+Let's keep all the subjects and log-transform the data. 
+First let's have a look at the anova output without the covariate:
+
+```{r}
+anova(mm2)
+```
+
+Now let's see how much influence does the covariate have:
+
+```{r}
+anova(mm3)
+```
+Now the size of muscular contraction has a significant impact on the gfp!
+
+Let's visually check marginal effects: 
+
+```{r,message=F}
+data_predicted <- ggpredict(mm3, terms = c("position","intensity"))
+plot(data_predicted, connect.lines = FALSE, add.data = TRUE) 
+
+```
+
+Let's check post hoc comparisons but let's only contrast different intensities within each coil orientation:
+
+```{r}
+emm <- emmeans(mm2, specs = ~ position * intensity)
+emm
+pairwise <- pairs(emm)
+print(pairwise)
+```
