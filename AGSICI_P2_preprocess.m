@@ -65,7 +65,7 @@ clear all; clc
 
 % ----------- dataset -----------
 study = 'P2';
-subject = [15];
+subject = [1:18];
 block = 1:9;
 protocol = {'spTMS', 'ppTMS'};
 intensity = {'CS1', 'CS2', 'CS3'};

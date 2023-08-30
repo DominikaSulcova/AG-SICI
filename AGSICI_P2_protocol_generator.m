@@ -17,7 +17,7 @@
 clear all, clc
 
 target_cortex = 'AG';  
-participant = {'01'};
+participant = {'15'};
 n_block = 9;
 rep_cond = 11;
 amp_TS = 120;
