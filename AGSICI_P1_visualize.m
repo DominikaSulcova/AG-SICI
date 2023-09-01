@@ -1406,6 +1406,86 @@ for c = 1:categories
 end
 clear a c categories counter colours_muscles data_temp data_TEP_gfp e gfp_temp name p s statement t TEP_peaks toi_TEP toi_artifact x_0 x_end x_start x_step
 
+%% 16) MUSCLES - ARTIFACT TOPOGRAPHY
+% ----- section input -----
+toi = [2 10];
+x_step = 0.5;
+x_0 = -50;
+varargin = {'shading' 'interp' 'whitebk' 'on'};
+% -------------------------
+% load muscle data
+load(output_file, 'data_muscles')
+
+% load header
+load([folder_git '\header_example.mat'])
+
+% identify artifact TOI limits
+x_start = (toi(1) - x_0)/x_step;
+x_end = (toi(2) - x_0)/x_step;
+
+% launch figure
+fig = figure(figure_counter);
+hold on
+counter_row = 1; counter_col = 0; counter_fig = 0;
+for s = 1:length(subject)
+    for p = 1:length(position)
+        % determine counters
+        counter_fig = counter_fig + 1;
+        counter_col = counter_col + 1;
+        if counter_col > 8
+            counter_row = counter_row + 1;
+            counter_col = 1;
+        end
+        
+        % get the data
+        data_topo = double(squeeze(mean(data_muscles(p, :, s, :, x_start:x_end), [2 5])));
+
+        %fetch chanlocs
+        chanlocs = header.chanlocs(1:32);
+        
+        % plot the topoplot
+        subplot(counter_row, counter_col, counter_fig)
+        topoplot(data_topo, chanlocs, varargin{:});
+        set(gcf,'color',[1 1 1]);
+
+        % add title
+        if p == 1
+            title(sprintf('subject %d', s))
+        end
+    end
+end
+hold off
+
+
+% export for Ragu 
+fprintf('exporting for Ragu:\n')
+for s = 1:length(subject)
+    % identify subject
+    if subject(s) < 10
+       subj = ['0' num2str(subject(s))];
+    else
+       subj = num2str(subject(s)); 
+    end
+    fprintf('subject %d :\n', subject(s))
+    for p = 1:length(position)
+        fprintf('%s ', strrep(position{p}, '_', ' '))
+        for i = 1:length(intensity)
+            fprintf('%s %%rMT... ', intensity{i}) 
+            % subset the data
+            data = squeeze(data_muscles(p, i, s, :, :))';
+
+            % save as .csv               
+            name = sprintf('AGSICI P1 MUSCLES S%s %s %s.csv', subj, position{p}, intensity{i});
+            writematrix(data, sprintf('%s\\AG-SICI_P1_export\\AG-SICI_P1_SSP\\%s', folder_results, name));
+        end
+        fprintf('\n')
+    end
+end
+fprintf('done.\n')
+fprintf('\n')
+
+clear toi data_muscles s p i data name fig data_topo x_end x_start x_step x_0 varargin
+ 
 %% muscle contraction X TEP GFP - correlation  
 % ----- section input -----
 TEP_peaks = {'P25' 'N45'};
